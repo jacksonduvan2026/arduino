@@ -59,14 +59,17 @@ def reimportar_excel(db: Session = Depends(get_db)):
     res = importar_datos_excel(excel_file, db)
     return {"message": "Datos reimportados con éxito", "detalles": res}
 
-# Configuración de Archivos Estáticos FRONTEND
-FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "FRONTEND"))
-if os.path.exists(FRONTEND_DIR):
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+# Configuración de Archivos Estáticos FRONTEND DIST (React + Vite)
+FRONTEND_DIST_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "FRONTEND", "dist"))
 
-    @app.get("/")
-    def serve_frontend():
-        index_file = os.path.join(FRONTEND_DIR, "index.html")
-        if os.path.exists(index_file):
-            return FileResponse(index_file)
-        return {"mensaje": "Frontend no disponible aún en FRONTEND/index.html"}
+if os.path.exists(FRONTEND_DIST_DIR):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST_DIR, "assets")), name="static_assets")
+
+    @app.get("/{full_path:path}")
+    def serve_react_app(full_path: str):
+        if full_path.startswith("api"):
+            raise HTTPException(status_code=404, detail="Endpoint API no encontrado")
+        file_path = os.path.join(FRONTEND_DIST_DIR, full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(FRONTEND_DIST_DIR, "index.html"))
