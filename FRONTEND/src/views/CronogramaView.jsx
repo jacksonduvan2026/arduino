@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { Search, Download, RefreshCw, ClipboardCheck, X, Save } from 'lucide-react';
+import { Search, Download, RefreshCw, ClipboardCheck, X, Save, CalendarRange } from 'lucide-react';
 
 export function CronogramaView() {
   const [data, setData] = useState(null);
@@ -72,7 +72,7 @@ export function CronogramaView() {
     <div>
       <div className="card">
         <div className="filter-bar">
-          <form onSubmit={handleSearch} style={{ display: 'flex', gap: '12px', flex: 1 }}>
+          <form onSubmit={handleSearch} style={{ display: 'flex', gap: '12px', flex: 1, minWidth: '300px' }}>
             <select
               className="form-control"
               style={{ width: '180px' }}
@@ -113,20 +113,20 @@ export function CronogramaView() {
           <div className="kpi-grid" style={{ marginBottom: '20px' }}>
             <div className="kpi-card">
               <div>
-                <span className="kpi-label">Total Conteos Programados</span>
+                <span className="kpi-label">Total Programados</span>
                 <div className="kpi-value">{data.kpis.total_programados.toLocaleString()}</div>
               </div>
             </div>
             <div className="kpi-card">
               <div>
                 <span className="kpi-label">Conteos Completados</span>
-                <div className="kpi-value text-success">{data.kpis.total_completados.toLocaleString()}</div>
+                <div className="kpi-value" style={{ color: 'var(--success)' }}>{data.kpis.total_completados.toLocaleString()}</div>
               </div>
             </div>
             <div className="kpi-card">
               <div>
                 <span className="kpi-label">Conteos Pendientes</span>
-                <div className="kpi-value text-danger">{data.kpis.total_pendientes.toLocaleString()}</div>
+                <div className="kpi-value" style={{ color: 'var(--primary)' }}>{data.kpis.total_pendientes.toLocaleString()}</div>
               </div>
             </div>
           </div>
@@ -148,23 +148,26 @@ export function CronogramaView() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '24px' }}>
-                    Cargando ítems del cronograma...
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+                    <div className="spin-animation" style={{ display: 'inline-block', marginBottom: '8px' }}>
+                      <CalendarRange size={22} color="var(--primary)" />
+                    </div>
+                    <div>Cargando ítems del cronograma cíclico...</div>
                   </td>
                 </tr>
               ) : !data || data.items.length === 0 ? (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '24px' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
                     No se encontraron registros programados.
                   </td>
                 </tr>
               ) : (
                 data.items.map((item) => (
                   <tr key={item.id}>
-                    <td><strong>Semana {item.semana}</strong></td>
-                    <td><span className="badge badge-secondary">{item.codigo_referencia}</span></td>
+                    <td><strong style={{ color: 'var(--text-main)' }}>Semana {item.semana}</strong></td>
+                    <td><span className="badge badge-primary">{item.codigo_referencia}</span></td>
                     <td>{item.descripcion}</td>
-                    <td>{item.categoria}</td>
+                    <td><span className="badge badge-secondary">{item.categoria}</span></td>
                     <td>Conteo #{item.numero_conteo}</td>
                     <td>
                       <span className={`badge ${item.estado === 'COMPLETADO' ? 'badge-success' : 'badge-warning'}`}>
@@ -198,27 +201,28 @@ export function CronogramaView() {
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Registrar Conteo Físico Real</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Registrar Conteo Físico Real</h3>
               <button className="btn btn-outline btn-sm" onClick={() => setSelectedItem(null)}>
                 <X size={16} />
               </button>
             </div>
             <div className="modal-body">
-              <p><strong>Referencia:</strong> {selectedItem.codigo_referencia} - {selectedItem.descripcion}</p>
-              <p><strong>Semana:</strong> {selectedItem.semana} | <strong>Conteo No:</strong> #{selectedItem.numero_conteo}</p>
+              <p style={{ fontSize: '0.9rem' }}><strong style={{ color: 'var(--text-main)' }}>Referencia:</strong> {selectedItem.codigo_referencia} - {selectedItem.descripcion}</p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}><strong>Semana:</strong> {selectedItem.semana} | <strong>Conteo No:</strong> #{selectedItem.numero_conteo}</p>
 
               <div>
-                <label className="kpi-label">Cantidad Física Contada</label>
+                <label className="kpi-label" style={{ marginBottom: '6px' }}>Cantidad Física Contada</label>
                 <input
                   type="number"
                   className="form-control"
                   value={cantFisica}
                   onChange={(e) => setCantFisica(e.target.value)}
+                  autoFocus
                 />
               </div>
 
               <div>
-                <label className="kpi-label">Observaciones / Incidencias</label>
+                <label className="kpi-label" style={{ marginBottom: '6px' }}>Observaciones / Incidencias</label>
                 <textarea
                   className="form-control"
                   rows="3"
