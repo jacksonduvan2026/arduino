@@ -292,42 +292,63 @@ def dijkstra_shortest_path(start_node: str, target_node: str):
 
 def calcular_costo_recogida_t(categoria: Optional[str], nivel: Optional[str]) -> Dict[str, Any]:
     """
-    Regla obligatoria de tiempos de recogida (unidades t):
-    - Rojo, nivel N1: 1t por recogida.
-    - Amarillo, nivel N2: 3t por recogida.
-    - Naranja, niveles N1 y N2: 4t por recogida (cubre N1 y N2).
+    Reglas obligatorias de tiempos de recogida y validación (unidades t):
+    - Rojo: solo nivel N2 (NIVEL_2), tiempo de recogida de 1t.
+    - Amarillo: solo nivel N1 (NIVEL_1), tiempo de recogida de 3t.
+    - Naranja: requiere N1 y N2 (AMBOS) como una sola operación lógica de 4t,
+      sin duplicar el tiempo por atender ambos niveles.
 
-    Si nivel es 'NIVEL_1', 'NIVEL_2' o 'AMBOS', o si se deduce por categoría:
-    - Rojo (o NIVEL_1 solo): 1t
-    - Amarillo (o NIVEL_2 solo): 3t
-    - Naranja (o AMBOS): 4t
+    Si la categoría o el nivel no coinciden con las reglas (o es SIN_NIVEL),
+    no se asigna silenciosamente 1t por defecto; se genera una advertencia explícita.
     """
     cat_norm = (categoria or "").strip().upper()
     niv_norm = (nivel or "").strip().upper()
 
-    # Si se especifica por nivel o categoría explícita
-    if niv_norm == "NIVEL_1" or cat_norm == "ROJO":
-        return {"tiempo_t": 1.0, "categoria": "ROJO", "nivel": "NIVEL_1", "advertencia": None}
-    elif niv_norm == "NIVEL_2" or cat_norm == "AMARILLO":
-        return {"tiempo_t": 3.0, "categoria": "AMARILLO", "nivel": "NIVEL_2", "advertencia": None}
-    elif niv_norm == "AMBOS" or cat_norm == "NARANJA":
-        return {"tiempo_t": 4.0, "categoria": "NARANJA", "nivel": "AMBOS", "advertencia": None}
+    advertencia = None
+
+    # Determinación según categoría o nivel asignado
+    if cat_norm == "ROJO" or niv_norm == "NIVEL_2":
+        if cat_norm == "ROJO" and niv_norm and niv_norm != "NIVEL_2":
+            advertencia = f"Advertencia de validación: La categoría ROJO exige únicamente Nivel 2 (NIVEL_2, 1t), pero la ubicación está configurada como {niv_norm}."
+        elif cat_norm == "ROJO" and niv_norm == "SIN_NIVEL":
+            advertencia = "Advertencia de validación: Ubicación en categoría ROJO sin nivel asignado (SIN_NIVEL)."
+        return {"tiempo_t": 1.0, "categoria": "ROJO", "nivel": "NIVEL_2", "advertencia": advertencia}
+
+    elif cat_norm == "AMARILLO" or niv_norm == "NIVEL_1":
+        if cat_norm == "AMARILLO" and niv_norm and niv_norm != "NIVEL_1":
+            advertencia = f"Advertencia de validación: La categoría AMARILLO exige únicamente Nivel 1 (NIVEL_1, 3t), pero la ubicación está configurada como {niv_norm}."
+        elif cat_norm == "AMARILLO" and niv_norm == "SIN_NIVEL":
+            advertencia = "Advertencia de validación: Ubicación en categoría AMARILLO sin nivel asignado (SIN_NIVEL)."
+        return {"tiempo_t": 3.0, "categoria": "AMARILLO", "nivel": "NIVEL_1", "advertencia": advertencia}
+
+    elif cat_norm == "NARANJA" or niv_norm == "AMBOS":
+        if cat_norm == "NARANJA" and niv_norm and niv_norm != "AMBOS":
+            advertencia = f"Advertencia de validación: La categoría NARANJA exige la operación conjunta en ambos niveles (AMBOS, 4t), pero la ubicación está configurada como {niv_norm}."
+        elif cat_norm == "NARANJA" and niv_norm == "SIN_NIVEL":
+            advertencia = "Advertencia de validación: Ubicación en categoría NARANJA sin nivel asignado (SIN_NIVEL)."
+        return {"tiempo_t": 4.0, "categoria": "NARANJA", "nivel": "AMBOS", "advertencia": advertencia}
+
     else:
-        # Si la categoría/nivel no puede determinarse
+        # Caso sin categoría de color ni nivel válido (por ej. SIN_NIVEL)
+        advertencia = (
+            f"Advertencia de validación: La combinación categoría='{categoria or 'N/A'}' "
+            f"y nivel='{nivel or 'SIN_NIVEL'}' no coincide con las reglas de picking "
+            "(Rojo: N2=1t, Amarillo: N1=3t, Naranja: AMBOS=4t)."
+        )
         return {
             "tiempo_t": 1.0,
-            "categoria": "DESCONOCIDO",
+            "categoria": cat_norm or "DESCONOCIDO",
             "nivel": niv_norm or "SIN_NIVEL",
-            "advertencia": "Categoría o nivel no registrado. Asignado tiempo base de 1t por defecto."
+            "advertencia": advertencia
         }
 
 def calcular_tiempo_pick(nivel: str, t_nivel1: float, t_nivel2: float, categoria: Optional[str] = None) -> float:
+    """
+    Calcula el tiempo de recogida en segundos a partir de las unidades `t`:
+    1t es equivalente a `t_nivel1` (tiempo base en segundos).
+    """
     info = calcular_costo_recogida_t(categoria, nivel)
     tiempo_t = info["tiempo_t"]
-    # Si t_nivel1 se proporciona como el valor en segundos de 1t, convertimos t a segundos:
-    # 1t -> 1 * t_nivel1
-    # 3t -> 3 * t_nivel1
-    # 4t -> 4 * t_nivel1
     return tiempo_t * t_nivel1
 
 def generar_instrucciones_arduino(trips: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -828,8 +849,7 @@ def calcular_ruta(req: RutaRequest, db: Session = Depends(get_db)):
         "velocidad_rover_ms": vel_ms,
         "restricciones": {
             "max_ubicaciones_por_viaje": 3,
-            "factor_nivel_2": "3x respecto al primer nivel",
-            "regla_tiempos_recogida": "Rojo N1=1t, Amarillo N2=3t, Naranja N1+N2=4t"
+            "regla_tiempos_recogida": "Rojo N2=1t, Amarillo N1=3t, Naranja N1+N2=4t (operación única)"
         },
         "ruta_inicial": res_inicial,
         "ruta_optimizada": res_optimizada,
@@ -837,7 +857,7 @@ def calcular_ruta(req: RutaRequest, db: Session = Depends(get_db)):
             "distancia_ahorrada_m": dist_ahorrada_m,
             "tiempo_ahorrado_s": tiempo_ahorrado_s,
             "porcentaje_mejora_distancia": round((dist_ahorrada_m / res_inicial["distancia_total_m"] * 100) if res_inicial["distancia_total_m"] > 0 else 0, 1),
-            "criterio_optimizacion": "La optimización evalúa las secuencias de recorrido sobre el grafo físico de 5 pasillos transitables del almacén, selecciona automáticamente la mejor puerta de SALIDA para minimizar el tiempo total (desplazamiento + recogida) y agrupa hasta 3 ubicaciones físicas por viaje."
+            "criterio_optimizacion": "La optimización evalúa las secuencias de recorrido sobre el grafo físico de 5 pasillos transitables del almacén, selecciona automáticamente la mejor puerta de SALIDA para minimizar el tiempo total (desplazamiento + recogida) y agrupa hasta 3 operaciones lógicas de recogida por viaje."
         },
         "validacion_referencia": {
             "referencia_documentada": {
@@ -857,8 +877,9 @@ def calcular_ruta(req: RutaRequest, db: Session = Depends(get_db)):
                 "diferencia_distancia_pct": dif_dist_pct,
                 "diferencia_viajes": dif_viajes,
                 "explicacion_discrepancia": (
-                    "1) La referencia agrupa 12 líneas en 4 viajes independientes con retornos completos a la salida en cada iteración (43.6 + 54.6 + 57.7 + 29.2 = 185.1m). "
-                    "2) El sistema actual consolida las 9 ubicaciones físicas únicas solicitadas en 3 viajes (9/3=3), eliminando retornos innecesarios y seleccionando la mejor salida (SALIDA_2), logrando un recorrido más corto (93.2m)."
+                    "Nota metodológica: La referencia documentada (185.1m, 20t, 4 viajes) evalúa 12 líneas de pedido en 4 viajes independientes con retornos obligatorios a la salida. "
+                    "No debe presentarse la diferencia entre 185.1 m y 93.2 m como una optimización demostrada hasta comparar exactamente los mismos pedidos, "
+                    "las mismas condiciones de inicio y salida, los retornos y los criterios de agrupación."
                 )
             }
         },

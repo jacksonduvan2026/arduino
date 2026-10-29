@@ -214,7 +214,7 @@ export function MapaView() {
             duration_s: task.tiempo_recogida_s || 15.0,
             nivel: task.nivel,
             etiqueta: task.etiqueta_completa || task.codigo_ubicacion,
-            description: `PARADA FÍSICA: Recogiendo en ${task.etiqueta_completa || task.codigo_ubicacion} (Nivel ${task.nivel === 'NIVEL_1' ? '1 [15s]' : task.nivel === 'NIVEL_2' ? '2 [45s - 3x]' : 'Ambos [60s]'})`
+            description: `PARADA FÍSICA: Recogiendo en ${task.etiqueta_completa || task.codigo_ubicacion} (Nivel ${task.nivel === 'NIVEL_1' ? '1 [Amarillo, 3t]' : task.nivel === 'NIVEL_2' ? '2 [Rojo, 1t]' : 'Ambos [Naranja, 4t]'})`
           });
           pickIdx++;
         }
@@ -439,7 +439,7 @@ export function MapaView() {
                 )}
                 <span>
                   {roverStatus === 'RECOGIENDO' && currentPickingTask
-                    ? `Recogiendo en ${currentPickingTask.etiqueta_completa || currentPickingTask.codigo_ubicacion} (${currentPickingTask.nivel === 'NIVEL_1' ? '1er Nivel - 15s' : currentPickingTask.nivel === 'NIVEL_2' ? '2do Nivel - 45s (3x)' : 'Ambos Niveles - 60s'})`
+                    ? `Recogiendo en ${currentPickingTask.etiqueta_completa || currentPickingTask.codigo_ubicacion} (${currentPickingTask.nivel === 'NIVEL_1' ? '1er Nivel (Amarillo) - 3t' : currentPickingTask.nivel === 'NIVEL_2' ? '2do Nivel (Rojo) - 1t' : 'Ambos Niveles (Naranja) - 4t'})`
                     : `Rover en nodo de tránsito ${currentWaypointNode}`}
                 </span>
               </div>
@@ -516,7 +516,7 @@ export function MapaView() {
 
               <div>
                 <label style={{ fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', fontSize: '0.78rem' }}>
-                  TIEMPO PICKING 1ER NIVEL (seg)
+                  TIEMPO BASE PICKING 1t (seg)
                 </label>
                 <input
                   type="number"
@@ -526,7 +526,7 @@ export function MapaView() {
                   onChange={(e) => setTiempoPickNivel1S(parseFloat(e.target.value) || 15.0)}
                 />
                 <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                  * Nivel 2 tomará {tiempoPickNivel1S * 3}s (3x primer nivel)
+                  * Rojo (N2) = 1t ({tiempoPickNivel1S}s), Amarillo (N1) = 3t ({tiempoPickNivel1S * 3}s), Naranja = 4t ({tiempoPickNivel1S * 4}s)
                 </span>
               </div>
 
@@ -812,9 +812,9 @@ export function MapaView() {
                   onChange={(e) => setEditingLoc({ ...editingLoc, nivel: e.target.value })}
                 >
                   <option value="SIN_NIVEL">Sin Nivel (Blanca)</option>
-                  <option value="NIVEL_1">Nivel 1 (Primer nivel - Amarillo)</option>
-                  <option value="NIVEL_2">Nivel 2 (Segundo nivel - Rojo, 3x tiempo)</option>
-                  <option value="AMBOS">Ambos Niveles (Nivel 1 y 2 - Naranja)</option>
+                  <option value="NIVEL_1">Nivel 1 (Primer nivel - Amarillo, 3t)</option>
+                  <option value="NIVEL_2">Nivel 2 (Segundo nivel - Rojo, 1t)</option>
+                  <option value="AMBOS">Ambos Niveles (Nivel 1 y 2 - Naranja, 4t)</option>
                 </select>
               </div>
 
