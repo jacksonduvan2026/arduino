@@ -366,8 +366,11 @@ export function MapaView() {
 
   if (loading && ubicaciones.length === 0) {
     return (
-      <div style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>
-        <p>Cargando mapa de almacén y parámetros...</p>
+      <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
+        <div className="spin-animation" style={{ display: 'inline-block', marginBottom: '8px' }}>
+          <MapPin size={28} color="var(--primary)" />
+        </div>
+        <p style={{ fontWeight: 500 }}>Cargando mapa interactivo de bodega y parámetros...</p>
       </div>
     );
   }
@@ -375,32 +378,32 @@ export function MapaView() {
   return (
     <div className="mapa-view-container">
       {/* Título de la Sección */}
-      <div className="card-header" style={{ marginBottom: '16px' }}>
+      <div className="card-header" style={{ marginBottom: '18px' }}>
         <div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MapPin className="text-primary" size={26} />
+          <h2 style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <MapPin size={24} style={{ color: 'var(--primary)' }} />
             Mapa de Almacén, Picking y Simulación Rover
           </h2>
-          <p style={{ fontSize: '0.88rem', color: '#64748b', marginTop: '4px' }}>
-            Layout de almacén interactivo con geometría fiel (7 columnas x 9 filas), clasificaciones de niveles y simulador Rover Arduino.
+          <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            Layout de almacén interactivo con geometría física exacta (7 columnas x 9 filas), clasificaciones de niveles y simulador Rover.
           </p>
         </div>
       </div>
 
       {error && (
-        <div className="card" style={{ backgroundColor: '#fee2e2', borderColor: '#fca5a5', color: '#991b1b', padding: '16px', marginBottom: '20px' }}>
-          <strong>Error:</strong> {error}
+        <div className="card" style={{ backgroundColor: 'var(--danger-light)', borderColor: 'var(--danger-border)', color: 'var(--danger)', padding: '16px', marginBottom: '20px' }}>
+          <strong>Error en Mapa:</strong> {error}
         </div>
       )}
 
       {/* Grid Principal: Mapa SVG a la izquierda, Panel de Control a la derecha */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '24px', marginBottom: '24px' }}>
         {/* Panel del Mapa */}
-        <div className="card" style={{ padding: '16px' }}>
-          <div className="card-header" style={{ marginBottom: '12px' }}>
+        <div className="card" style={{ padding: '18px' }}>
+          <div className="card-header" style={{ marginBottom: '14px' }}>
             <h3 className="card-title" style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Layers size={18} className="text-primary" />
-              Vista General del Almacén ({ubicaciones.length} posiciones)
+              <Layers size={18} style={{ color: 'var(--primary)' }} />
+              Vista General del Almacén ({ubicaciones.length} posiciones físicas)
             </h3>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button className="btn btn-outline btn-sm" onClick={handleClearSelection} disabled={selectedLocIds.length === 0}>
@@ -412,25 +415,25 @@ export function MapaView() {
           {/* Banner de Estado de la Simulación Virtual en Vivo */}
           {isSimulating && (
             <div style={{
-              backgroundColor: roverStatus === 'RECOGIENDO' ? '#451a03' : '#0c4a6e',
-              border: `1px solid ${roverStatus === 'RECOGIENDO' ? '#f59e0b' : '#38bdf8'}`,
+              backgroundColor: roverStatus === 'RECOGIENDO' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 23, 68, 0.12)',
+              border: `1px solid ${roverStatus === 'RECOGIENDO' ? 'var(--warning-border)' : 'var(--primary-dark)'}`,
               color: '#ffffff',
-              padding: '10px 14px',
-              borderRadius: '6px',
-              marginBottom: '12px',
-              fontSize: '0.85rem',
+              padding: '12px 16px',
+              borderRadius: 'var(--radius)',
+              marginBottom: '14px',
+              fontSize: '0.86rem',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '12px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 {roverStatus === 'RECOGIENDO' ? (
-                  <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b', color: '#fff', fontWeight: 'bold' }}>
+                  <span className="badge badge-warning" style={{ fontWeight: 'bold' }}>
                     DETENIDO EN ESTANTERÍA
                   </span>
                 ) : (
-                  <span className="badge badge-primary" style={{ backgroundColor: '#0284c7', color: '#fff', fontWeight: 'bold' }}>
+                  <span className="badge badge-primary" style={{ fontWeight: 'bold' }}>
                     MOVIÉNDOSE EN PASILLO
                   </span>
                 )}
@@ -442,7 +445,7 @@ export function MapaView() {
               </div>
 
               {roverStatus === 'RECOGIENDO' && (
-                <div style={{ backgroundColor: '#78350f', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold', color: '#fef08a' }}>
+                <div style={{ backgroundColor: 'var(--warning-light)', border: '1px solid var(--warning-border)', padding: '4px 10px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--warning)' }}>
                   Tiempo restante: {pickingTimeRemaining}s
                 </div>
               )}
@@ -468,15 +471,15 @@ export function MapaView() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Tarjeta de Parámetros de Ruta */}
           <div className="card">
-            <h3 className="card-title" style={{ fontSize: '1rem', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Sliders size={18} className="text-primary" />
+            <h3 className="card-title" style={{ fontSize: '0.98rem', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sliders size={18} style={{ color: 'var(--primary)' }} />
               Parámetros de Recorrido
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.88rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.86rem' }}>
               <div>
-                <label style={{ fontWeight: '500', color: '#475569', display: 'block', marginBottom: '4px' }}>
-                  Salida de Inicio:
+                <label style={{ fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', fontSize: '0.78rem' }}>
+                  SALIDA DE INICIO
                 </label>
                 <select className="form-control" value={salidaInicio} onChange={(e) => setSalidaInicio(e.target.value)}>
                   <option value="AUTO">Automático (Mejor Salida)</option>
@@ -486,8 +489,8 @@ export function MapaView() {
               </div>
 
               <div>
-                <label style={{ fontWeight: '500', color: '#475569', display: 'block', marginBottom: '4px' }}>
-                  Salida de Retorno:
+                <label style={{ fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', fontSize: '0.78rem' }}>
+                  SALIDA DE RETORNO
                 </label>
                 <select className="form-control" value={salidaFin} onChange={(e) => setSalidaFin(e.target.value)}>
                   <option value="AUTO">Automático (Mejor Salida)</option>
@@ -497,8 +500,8 @@ export function MapaView() {
               </div>
 
               <div>
-                <label style={{ fontWeight: '500', color: '#475569', display: 'block', marginBottom: '4px' }}>
-                  Velocidad Rover (m/s):
+                <label style={{ fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', fontSize: '0.78rem' }}>
+                  VELOCIDAD ROVER (m/s)
                 </label>
                 <input
                   type="number"
@@ -512,8 +515,8 @@ export function MapaView() {
               </div>
 
               <div>
-                <label style={{ fontWeight: '500', color: '#475569', display: 'block', marginBottom: '4px' }}>
-                  T. Recogida 1er Nivel (seg):
+                <label style={{ fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', fontSize: '0.78rem' }}>
+                  TIEMPO PICKING 1ER NIVEL (seg)
                 </label>
                 <input
                   type="number"
@@ -522,7 +525,7 @@ export function MapaView() {
                   value={tiempoPickNivel1S}
                   onChange={(e) => setTiempoPickNivel1S(parseFloat(e.target.value) || 15.0)}
                 />
-                <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                   * Nivel 2 tomará {tiempoPickNivel1S * 3}s (3x primer nivel)
                 </span>
               </div>
@@ -534,9 +537,9 @@ export function MapaView() {
           </div>
 
           {/* Tarjeta Controles de Simulación Virtual */}
-          <div className="card" style={{ backgroundColor: '#0f172a', color: '#ffffff', borderColor: '#1e293b' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ fontSize: '0.98rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8' }}>
+          <div className="card" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
                 <Bot size={20} /> Simulador Virtual Rover
               </h3>
               <span className={`badge ${isSimulating ? (isPaused ? 'badge-warning' : 'badge-success') : 'badge-secondary'}`}>
@@ -546,22 +549,22 @@ export function MapaView() {
 
             {/* Señal acústica visual durante simulación */}
             {activeBeepSignal && (
-              <div style={{ backgroundColor: '#ca8a04', color: '#ffffff', padding: '6px 12px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ backgroundColor: 'var(--warning-light)', color: 'var(--warning)', border: '1px solid var(--warning-border)', padding: '6px 12px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Volume2 size={16} className="pulse-animation" /> {activeBeepSignal}
               </div>
             )}
 
             {/* Selector de modo de ruta */}
             {rutaCalculada && (
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', background: '#1e293b', padding: '4px', borderRadius: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', background: 'var(--bg-card)', padding: '4px', borderRadius: '6px', border: '1px solid var(--border)' }}>
                 <button
-                  style={{ flex: 1, padding: '6px', fontSize: '0.78rem', border: 'none', borderRadius: '4px', cursor: 'pointer', background: modoRuta === 'optimizada' ? '#2563eb' : 'transparent', color: '#fff', fontWeight: modoRuta === 'optimizada' ? 'bold' : 'normal' }}
+                  style={{ flex: 1, padding: '6px', fontSize: '0.78rem', border: 'none', borderRadius: '4px', cursor: 'pointer', background: modoRuta === 'optimizada' ? 'var(--primary)' : 'transparent', color: '#fff', fontWeight: modoRuta === 'optimizada' ? 'bold' : 'normal' }}
                   onClick={() => setModoRuta('optimizada')}
                 >
                   Ruta Optimizada
                 </button>
                 <button
-                  style={{ flex: 1, padding: '6px', fontSize: '0.78rem', border: 'none', borderRadius: '4px', cursor: 'pointer', background: modoRuta === 'inicial' ? '#2563eb' : 'transparent', color: '#fff', fontWeight: modoRuta === 'inicial' ? 'bold' : 'normal' }}
+                  style={{ flex: 1, padding: '6px', fontSize: '0.78rem', border: 'none', borderRadius: '4px', cursor: 'pointer', background: modoRuta === 'inicial' ? 'var(--primary)' : 'transparent', color: '#fff', fontWeight: modoRuta === 'inicial' ? 'bold' : 'normal' }}
                   onClick={() => setModoRuta('inicial')}
                 >
                   Ruta Inicial
@@ -571,8 +574,8 @@ export function MapaView() {
 
             {/* Selector de Multiplicador de Velocidad */}
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>
-                Velocidad Simulación en Pantalla:
+              <label style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>
+                VELOCIDAD SIMULACIÓN EN PANTALLA:
               </label>
               <div style={{ display: 'flex', gap: '6px' }}>
                 {[1, 2, 5, 10].map((mult) => (
@@ -581,11 +584,11 @@ export function MapaView() {
                     onClick={() => setSimSpeedMultiplier(mult)}
                     style={{
                       flex: 1,
-                      padding: '4px 8px',
+                      padding: '5px 8px',
                       fontSize: '0.78rem',
-                      border: '1px solid #334155',
+                      border: '1px solid var(--border)',
                       borderRadius: '4px',
-                      background: simSpeedMultiplier === mult ? '#0284c7' : '#1e293b',
+                      background: simSpeedMultiplier === mult ? 'var(--primary)' : 'var(--bg-card)',
                       color: '#ffffff',
                       cursor: 'pointer',
                       fontWeight: simSpeedMultiplier === mult ? 'bold' : 'normal'
@@ -600,21 +603,21 @@ export function MapaView() {
             {/* Botones Principales de Control */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
               {!isSimulating ? (
-                <button className="btn btn-primary" style={{ gridColumn: 'span 2', backgroundColor: '#10b981' }} onClick={iniciarSimulacion} disabled={!rutaCalculada}>
+                <button className="btn btn-primary" style={{ gridColumn: 'span 2' }} onClick={iniciarSimulacion} disabled={!rutaCalculada}>
                   <Play size={16} /> Iniciar Simulación
                 </button>
               ) : (
                 <>
                   {isPaused ? (
-                    <button className="btn btn-primary" style={{ backgroundColor: '#10b981' }} onClick={reanudarSimulacion}>
+                    <button className="btn btn-primary" onClick={reanudarSimulacion}>
                       <Play size={16} /> Reanudar
                     </button>
                   ) : (
-                    <button className="btn btn-warning" style={{ backgroundColor: '#f59e0b', color: '#fff' }} onClick={pausarSimulacion}>
+                    <button className="btn btn-warning" onClick={pausarSimulacion}>
                       <Pause size={16} /> Pausar
                     </button>
                   )}
-                  <button className="btn btn-outline" style={{ color: '#fff', borderColor: '#475569' }} onClick={reiniciarSimulacion}>
+                  <button className="btn btn-outline" onClick={reiniciarSimulacion}>
                     <RotateCcw size={16} /> Reiniciar
                   </button>
                 </>
@@ -628,22 +631,22 @@ export function MapaView() {
             )}
 
             {/* Métrica de Tiempos en Pantalla vs Físico */}
-            <div style={{ backgroundColor: '#1e293b', padding: '12px', borderRadius: '6px', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ backgroundColor: 'var(--bg-card)', padding: '12px', borderRadius: '6px', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '6px', border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#94a3b8' }}>Tiempo Físico Estimado:</span>
-                <strong style={{ color: '#38bdf8' }}>{Math.round(activeRoute ? activeRoute.tiempo_total_s : 0)}s</strong>
+                <span style={{ color: 'var(--text-muted)' }}>Tiempo Físico Estimado:</span>
+                <strong style={{ color: 'var(--primary)' }}>{Math.round(activeRoute ? activeRoute.tiempo_total_s : 0)}s</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#94a3b8' }}>T. Desplazamiento:</span>
+                <span style={{ color: 'var(--text-muted)' }}>T. Desplazamiento:</span>
                 <span>{Math.round(activeRoute ? activeRoute.tiempo_desplazamiento_s : 0)}s</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#94a3b8' }}>T. Recogidas:</span>
+                <span style={{ color: 'var(--text-muted)' }}>T. Recogidas:</span>
                 <span>{Math.round(activeRoute ? activeRoute.tiempo_recogida_s : 0)}s</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #334155', paddingTop: '4px', marginTop: '2px' }}>
-                <span style={{ color: '#94a3b8' }}>Tiempo Simulación Real:</span>
-                <span style={{ color: '#facc15', fontWeight: 'bold' }}>{Math.round(simTimeElapsedS)}s ({simSpeedMultiplier}x)</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '6px', marginTop: '2px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Tiempo Simulación Real:</span>
+                <span style={{ color: 'var(--warning)', fontWeight: 'bold' }}>{Math.round(simTimeElapsedS)}s ({simSpeedMultiplier}x)</span>
               </div>
             </div>
           </div>
@@ -669,7 +672,7 @@ export function MapaView() {
       <div className="card" style={{ marginTop: '24px' }}>
         <div className="card-header">
           <h3 className="card-title" style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Package size={18} className="text-primary" />
+            <Package size={18} style={{ color: 'var(--primary)' }} />
             Configuración de Estanterías y Clasificación por Nivel
           </h3>
         </div>
@@ -690,12 +693,12 @@ export function MapaView() {
             </thead>
             <tbody>
               {ubicaciones.map((u) => (
-                <tr key={u.id} style={{ backgroundColor: u.es_duplicado ? '#fff7ed' : 'transparent' }}>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#64748b' }}>{u.id}</td>
+                <tr key={u.id}>
+                  <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{u.id}</td>
                   <td>
                     <strong>{u.codigo_visible}</strong>
                     {u.es_duplicado && (
-                      <span style={{ fontSize: '0.72rem', color: '#c2410c', display: 'block' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--danger)', display: 'block' }}>
                         [Fila {u.fila}, Col {u.columna}]
                       </span>
                     )}
@@ -711,25 +714,26 @@ export function MapaView() {
                         ? 'badge'
                         : 'badge-secondary'
                     }`} style={{
-                      backgroundColor: u.nivel === 'AMBOS' ? '#ffedd5' : undefined,
-                      color: u.nivel === 'AMBOS' ? '#9a3412' : undefined
+                      backgroundColor: u.nivel === 'AMBOS' ? 'rgba(234, 88, 12, 0.2)' : undefined,
+                      color: u.nivel === 'AMBOS' ? '#ea580c' : undefined,
+                      borderColor: u.nivel === 'AMBOS' ? '#ea580c' : undefined
                     }}>
-                      {u.nivel === 'NIVEL_1' ? '1er Nivel (Amarillo)' : u.nivel === 'NIVEL_2' ? '2do Nivel (Rojo)' : u.nivel === 'AMBOS' ? 'Ambos (Naranja)' : 'Sin Nivel (Blanco)'}
+                      {u.nivel === 'NIVEL_1' ? '1er Nivel (Amarillo)' : u.nivel === 'NIVEL_2' ? '2do Nivel (Rojo)' : u.nivel === 'AMBOS' ? 'Ambos (Naranja)' : 'Sin Nivel (Blanca)'}
                     </span>
                   </td>
                   <td>
                     <div>
                       <strong style={{ fontSize: '0.85rem' }}>{u.producto_codigo || 'Sin asignar'}</strong>
-                      <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{u.producto_descripcion}</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{u.producto_descripcion}</div>
                     </div>
                   </td>
                   <td>
                     {u.es_duplicado ? (
-                      <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="badge badge-danger">
                         <AlertTriangle size={12} /> Duplicado ({u.codigo_visible})
                       </span>
                     ) : (
-                      <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Normal</span>
+                      <span style={{ color: 'var(--text-subtle)', fontSize: '0.8rem' }}>Normal</span>
                     )}
                   </td>
                   <td>
@@ -757,7 +761,7 @@ export function MapaView() {
                         Ambos
                       </button>
                       <button
-                        title="Sin Nivel Asignado (Blanco)"
+                        title="Sin Nivel Asignado (Blanca)"
                         style={{ border: '1px solid #94a3b8', background: '#ffffff', color: '#0f172a', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 'bold' }}
                         onClick={() => handleQuickAssignLevel(u.id, 'SIN_NIVEL')}
                       >
@@ -782,13 +786,13 @@ export function MapaView() {
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>Editar Ubicación {editingLoc.id}</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Editar Ubicación {editingLoc.id}</h3>
               <button className="btn btn-outline btn-sm" onClick={() => setEditingLoc(null)}>X</button>
             </div>
             <div className="modal-body">
               <div>
-                <label style={{ fontWeight: '500', color: '#475569', display: 'block', marginBottom: '4px' }}>
-                  Código Visible:
+                <label className="kpi-label" style={{ marginBottom: '6px' }}>
+                  Código Visible
                 </label>
                 <input
                   type="text"
@@ -799,15 +803,15 @@ export function MapaView() {
               </div>
 
               <div>
-                <label style={{ fontWeight: '500', color: '#475569', display: 'block', marginBottom: '4px' }}>
-                  Nivel de Recogida:
+                <label className="kpi-label" style={{ marginBottom: '6px' }}>
+                  Nivel de Recogida
                 </label>
                 <select
                   className="form-control"
                   value={editingLoc.nivel}
                   onChange={(e) => setEditingLoc({ ...editingLoc, nivel: e.target.value })}
                 >
-                  <option value="SIN_NIVEL">Sin Nivel (Blanco)</option>
+                  <option value="SIN_NIVEL">Sin Nivel (Blanca)</option>
                   <option value="NIVEL_1">Nivel 1 (Primer nivel - Amarillo)</option>
                   <option value="NIVEL_2">Nivel 2 (Segundo nivel - Rojo, 3x tiempo)</option>
                   <option value="AMBOS">Ambos Niveles (Nivel 1 y 2 - Naranja)</option>
@@ -815,8 +819,8 @@ export function MapaView() {
               </div>
 
               <div>
-                <label style={{ fontWeight: '500', color: '#475569', display: 'block', marginBottom: '4px' }}>
-                  Producto Asignado:
+                <label className="kpi-label" style={{ marginBottom: '6px' }}>
+                  Producto Asignado
                 </label>
                 <select
                   className="form-control"
@@ -841,15 +845,15 @@ export function MapaView() {
       )}
 
       {/* Nota de Integración Futura con Hardware Arduino */}
-      <div className="card" style={{ backgroundColor: '#f8fafc', borderColor: '#cbd5e1', marginTop: '24px' }}>
+      <div className="card" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)', marginTop: '24px' }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-          <Info className="text-primary" size={22} style={{ flexShrink: 0, marginTop: '2px' }} />
+          <Info size={22} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--primary)' }} />
           <div>
-            <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#0f172a', marginBottom: '4px' }}>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
               Puntos de Integración con Rover Arduino Físico (Fase Posterior)
             </h4>
-            <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: '1.5' }}>
-              Esta simulación se ejecuta de forma completamente virtual en el navegador. La arquitectura está preparada para enviar la secuencia de comandos por puerto serie USB al Arduino (`/api/arduino/comando`) cuando se confirme la integración física con motores y sensores IR.
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+              Esta simulación se ejecuta de forma virtual en el navegador. La arquitectura está preparada para enviar la secuencia de comandos por puerto serie USB al Arduino (`/api/arduino/comando`) cuando se confirme la integración física con motores y sensores IR.
             </p>
           </div>
         </div>

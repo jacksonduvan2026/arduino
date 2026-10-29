@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { Download } from 'lucide-react';
+import { Download, PackageCheck, Boxes } from 'lucide-react';
 
 export function ProductosView() {
   const [items, setItems] = useState([]);
@@ -25,14 +25,17 @@ export function ProductosView() {
   return (
     <div className="card">
       <div className="card-header">
-        <h3 className="card-title">Productos Propuestos para Incorporar al Inventario</h3>
+        <h3 className="card-title">
+          <PackageCheck size={20} style={{ color: 'var(--primary)' }} />
+          Productos Propuestos para Incorporar al Inventario
+        </h3>
         <a
           href="/api/productos-incluir/export/csv"
           className="btn btn-outline btn-sm"
           target="_blank"
           rel="noreferrer"
         >
-          <Download size={16} /> Exportar CSV
+          <Download size={15} /> Exportar CSV
         </a>
       </div>
 
@@ -61,21 +64,24 @@ export function ProductosView() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="16" style={{ textAlign: 'center', padding: '24px' }}>
-                  Cargando productos a incluir...
+                <td colSpan="16" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+                  <div className="spin-animation" style={{ display: 'inline-block', marginBottom: '8px' }}>
+                    <Boxes size={22} color="var(--primary)" />
+                  </div>
+                  <div>Cargando catálogo de productos a incluir...</div>
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan="16" style={{ textAlign: 'center', padding: '24px' }}>
-                  No hay productos registrados.
+                <td colSpan="16" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+                  No hay productos registrados en esta lista.
                 </td>
               </tr>
             ) : (
               items.map((p) => (
                 <tr key={p.codigo}>
-                  <td><strong>{p.codigo}</strong></td>
-                  <td>{p.descripcion}</td>
+                  <td><span className="badge badge-primary">{p.codigo}</span></td>
+                  <td style={{ fontWeight: '500' }}>{p.descripcion}</td>
                   <td><span className="badge badge-secondary">{p.categoria}</span></td>
                   <td>{p.meses.enero ?? '-'}</td>
                   <td>{p.meses.febrero ?? '-'}</td>
@@ -89,7 +95,7 @@ export function ProductosView() {
                   <td>{p.meses.octubre ?? '-'}</td>
                   <td>{p.meses.noviembre ?? '-'}</td>
                   <td>{p.meses.diciembre ?? '-'}</td>
-                  <td><strong>{p.total_anual}</strong></td>
+                  <td><strong style={{ color: 'var(--primary)' }}>{p.total_anual}</strong></td>
                 </tr>
               ))
             )}

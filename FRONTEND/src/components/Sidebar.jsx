@@ -8,7 +8,11 @@ import {
   BarChart3,
   Database,
   Bot,
-  MapPin
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
+  Radio,
+  X
 } from 'lucide-react';
 
 export const navigationItems = [
@@ -23,38 +27,82 @@ export const navigationItems = [
   { id: 'arduino', label: 'Robot Arduino', icon: Bot },
 ];
 
-export function Sidebar({ currentTab, onSelectTab }) {
+export function Sidebar({ currentTab, onSelectTab, isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile }) {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-brand">
-        <Boxes className="sidebar-brand-icon" />
-        <div>
-          <h2>INVENTARIO CÍCLICO</h2>
-          <span>Sistema Integrado & Rover</span>
+    <>
+      {/* Backdrop overlay for mobile screen */}
+      {isMobileOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={onCloseMobile}
+        />
+      )}
+
+      <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
+        {/* Brand / Logo */}
+        <div className="sidebar-brand">
+          <div className="sidebar-logo-wrapper">
+            <Boxes className="sidebar-brand-icon" />
+          </div>
+          {!isCollapsed && (
+            <div className="sidebar-brand-text">
+              <h2>GESTIÓN BODEGA</h2>
+              <span>Sistema & Rover virtual</span>
+            </div>
+          )}
+          {/* Mobile close button */}
+          <button className="mobile-close-btn" onClick={onCloseMobile}>
+            <X size={20} />
+          </button>
         </div>
-      </div>
 
-      <nav className="sidebar-nav">
-        {navigationItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = currentTab === item.id;
-          return (
-            <button
-              key={item.id}
-              className={`nav-item ${isActive ? 'active' : ''}`}
-              onClick={() => onSelectTab(item.id)}
-            >
-              <Icon size={20} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
+        {/* Toggle Collapse Desktop */}
+        <button
+          className="sidebar-collapse-toggle"
+          onClick={onToggleCollapse}
+          title={isCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+        >
+          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
 
-      <div className="sidebar-footer">
-        <span className="status-dot"></span>
-        <span>Servidor FastAPI Conectado</span>
-      </div>
-    </aside>
+        {/* Navigation Items */}
+        <nav className="sidebar-nav">
+          {navigationItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = currentTab === item.id;
+            return (
+              <button
+                key={item.id}
+                className={`nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => {
+                  onSelectTab(item.id);
+                  if (isMobileOpen) onCloseMobile();
+                }}
+                title={isCollapsed ? item.label : undefined}
+              >
+                <div className="nav-item-icon-wrapper">
+                  <Icon size={20} />
+                </div>
+                {!isCollapsed && <span className="nav-item-label">{item.label}</span>}
+                {isActive && <div className="active-indicator" />}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="sidebar-footer">
+          <div className="status-indicator">
+            <span className="status-dot pulse-animation" />
+            {!isCollapsed && (
+              <div className="status-text">
+                <span className="status-title">Servidor FastAPI</span>
+                <span className="status-sub">En línea & Conectado</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }

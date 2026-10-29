@@ -1,13 +1,12 @@
 import React from 'react';
-import { PackageCheck, Clock, Layers, AlertCircle, CheckCircle2, PlayCircle } from 'lucide-react';
+import { PackageCheck, Clock, AlertCircle, CheckCircle2, PlayCircle } from 'lucide-react';
 
 export function ListaDespacho({ listaDespacho, currentTaskIndex, isSimulating }) {
   if (!listaDespacho || listaDespacho.length === 0) {
     return (
-      <div className="card" style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
-        <PackageCheck size={36} style={{ marginBottom: '8px', color: '#94a3b8' }} />
-        <p style={{ fontWeight: 500 }}>No hay ninguna lista de despacho generada.</p>
-
+      <div className="card" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+        <PackageCheck size={36} style={{ marginBottom: '8px', color: 'var(--text-subtle)' }} />
+        <p style={{ fontWeight: 500 }}>No hay ninguna lista de despacho generada para esta ruta.</p>
       </div>
     );
   }
@@ -15,11 +14,11 @@ export function ListaDespacho({ listaDespacho, currentTaskIndex, isSimulating })
   const getNivelBadge = (nivel) => {
     switch (nivel) {
       case 'NIVEL_1':
-        return <span className="badge badge-warning" style={{ backgroundColor: '#fef08a', color: '#854d0e' }}>1er Nivel</span>;
+        return <span className="badge badge-warning">1er Nivel (15s)</span>;
       case 'NIVEL_2':
-        return <span className="badge badge-danger" style={{ backgroundColor: '#fecaca', color: '#991b1b' }}>2do Nivel (3x T)</span>;
+        return <span className="badge badge-danger">2do Nivel (45s - 3x)</span>;
       case 'AMBOS':
-        return <span className="badge" style={{ backgroundColor: '#ffedd5', color: '#9a3412' }}>Ambos Niveles</span>;
+        return <span className="badge" style={{ backgroundColor: 'rgba(234, 88, 12, 0.2)', color: '#ea580c', border: '1px solid #ea580c' }}>Ambos Niveles (60s)</span>;
       default:
         return <span className="badge badge-secondary">{nivel}</span>;
     }
@@ -28,12 +27,12 @@ export function ListaDespacho({ listaDespacho, currentTaskIndex, isSimulating })
   return (
     <div className="card">
       <div className="card-header">
-        <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <PackageCheck className="text-primary" size={20} />
-          Lista de Despacho ({listaDespacho.length} tareas)
+        <h3 className="card-title">
+          <PackageCheck size={20} style={{ color: 'var(--primary)' }} />
+          Lista de Despacho y Tareas de Recogida ({listaDespacho.length} tareas)
         </h3>
         <span className="badge badge-secondary">
-          Máx. 3 ubicaciones por viaje
+          Restricción: Máx. 3 ubicaciones por viaje
         </span>
       </div>
 
@@ -57,20 +56,20 @@ export function ListaDespacho({ listaDespacho, currentTaskIndex, isSimulating })
               const isCompleted = isSimulating && idx < currentTaskIndex;
 
               let statusBadge = (
-                <span className="badge badge-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <span className="badge badge-secondary">
                   <Clock size={12} /> Pendiente
                 </span>
               );
 
               if (isCurrent) {
                 statusBadge = (
-                  <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fef3c7', color: '#b45309' }}>
+                  <span className="badge badge-warning" style={{ fontWeight: 'bold' }}>
                     <PlayCircle size={12} className="spin-animation" /> Recogiendo...
                   </span>
                 );
               } else if (isCompleted) {
                 statusBadge = (
-                  <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <span className="badge badge-success">
                     <CheckCircle2 size={12} /> Completada
                   </span>
                 );
@@ -80,35 +79,35 @@ export function ListaDespacho({ listaDespacho, currentTaskIndex, isSimulating })
                 <tr
                   key={`${task.ubicacion_id}-${idx}`}
                   style={{
-                    backgroundColor: isCurrent ? '#f0f9ff' : 'transparent',
+                    backgroundColor: isCurrent ? 'rgba(255, 23, 68, 0.08)' : 'transparent',
                     fontWeight: isCurrent ? '600' : 'normal'
                   }}
                 >
-                  <td style={{ textAlign: 'center', fontWeight: 'bold' }}>#{task.orden_visita}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>#{task.orden_visita}</td>
                   <td>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 'bold', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                    <span className="badge badge-primary" style={{ fontFamily: 'monospace' }}>
                       {task.codigo_ubicacion}
                     </span>
                   </td>
                   <td>
                     <div>
-                      <strong style={{ fontSize: '0.85rem' }}>{task.producto_codigo}</strong>
-                      <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{task.producto_descripcion}</div>
+                      <strong style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>{task.producto_codigo}</strong>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{task.producto_descripcion}</div>
                     </div>
                   </td>
                   <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{task.cantidad_solicitada}</td>
                   <td style={{ textAlign: 'center' }}>
-                    <span style={{ color: task.cantidad_disponible < task.cantidad_solicitada ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>
+                    <span style={{ color: task.cantidad_disponible < task.cantidad_solicitada ? 'var(--danger)' : 'var(--success)', fontWeight: 'bold' }}>
                       {task.cantidad_disponible}
                     </span>
                     {task.nota_advertencia && (
-                      <span title={task.nota_advertencia} style={{ marginLeft: '4px', color: '#ef4444', cursor: 'pointer' }}>
+                      <span title={task.nota_advertencia} style={{ marginLeft: '4px', color: 'var(--danger)', cursor: 'pointer' }}>
                         <AlertCircle size={14} style={{ display: 'inline' }} />
                       </span>
                     )}
                   </td>
                   <td>{getNivelBadge(task.nivel)}</td>
-                  <td style={{ fontWeight: '500' }}>{task.tiempo_recogida_s}s</td>
+                  <td style={{ fontWeight: '600', color: 'var(--text-main)' }}>{task.tiempo_recogida_s}s</td>
                   <td>{statusBadge}</td>
                 </tr>
               );

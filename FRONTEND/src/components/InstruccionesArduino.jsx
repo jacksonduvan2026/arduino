@@ -21,7 +21,7 @@ export function InstruccionesArduino({ rutaCalculada, modoRuta }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const cppSnippet = `// Sketch de Prueba de Comandos para Arduino Rover
+  const cppSnippet = `// Sketch Firmware de Control para Arduino Rover
 // Protocolo Serie USB - 115200 baudios
 #include <Arduino.h>
 
@@ -58,10 +58,10 @@ void loop() {
 `;
 
   return (
-    <div className="card" style={{ marginTop: '24px', borderLeft: '4px solid #0284c7' }}>
+    <div className="card" style={{ marginTop: '24px', borderLeft: '4px solid var(--primary)' }}>
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.05rem' }}>
-          <Terminal className="text-primary" size={20} />
+        <h3 className="card-title">
+          <Terminal size={20} style={{ color: 'var(--primary)' }} />
           Instrucciones para Arduino / Código de Recorrido
         </h3>
 
@@ -70,47 +70,34 @@ void loop() {
             className={`btn btn-sm ${activeTab === 'comandos' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setActiveTab('comandos')}
           >
-            <Code size={14} style={{ marginRight: '4px' }} /> Plan de Comandos
+            <Code size={14} /> Plan de Comandos
           </button>
           <button
             className={`btn btn-sm ${activeTab === 'cpp' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setActiveTab('cpp')}
           >
-            <Cpu size={14} style={{ marginRight: '4px' }} /> Firmware C++
+            <Cpu size={14} /> Firmware C++
           </button>
-          <button className="btn btn-outline btn-sm" onClick={handleCopy} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            {copied ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+          <button className="btn btn-outline btn-sm" onClick={handleCopy} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            {copied ? <Check size={14} color="var(--success)" /> : <Copy size={14} />}
             {copied ? '¡Copiado!' : 'Copiar Instrucciones'}
           </button>
         </div>
       </div>
 
-      <p style={{ fontSize: '0.84rem', color: '#64748b', marginBottom: '14px' }}>
-        Secuencia de comandos generada para la ruta {modoRuta} (Salida {rutaCalculada.salida_inicio} a {rutaCalculada.salida_fin}, {activeRoute.numero_viajes} viaje(s)).
+      <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+        Secuencia de comandos generada para la ruta <strong>{modoRuta}</strong> (Salida {rutaCalculada.salida_inicio} a {rutaCalculada.salida_fin}, {activeRoute.numero_viajes} viaje(s)).
       </p>
 
       {activeTab === 'comandos' ? (
         <div>
           {/* Bloque de Comandos de Texto */}
-          <div style={{
-            background: '#0f172a',
-            color: '#38bdf8',
-            fontFamily: 'monospace',
-            fontSize: '0.88rem',
-            padding: '16px',
-            borderRadius: '6px',
-            maxHeight: '220px',
-            overflowY: 'auto',
-            lineHeight: '1.6',
-            whiteSpace: 'pre-wrap',
-            marginBottom: '16px',
-            border: '1px solid #1e293b'
-          }}>
+          <div className="terminal-box" style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '16px', whiteSpace: 'pre-wrap' }}>
             {instrucciones.comandos_texto}
           </div>
 
           {/* Desglose de Pasos de Instrucción */}
-          <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>
+          <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '10px' }}>
             Desglose de Pasos y Patrones de Pitido Acústico
           </h4>
           <div className="table-responsive" style={{ maxHeight: '250px', overflowY: 'auto' }}>
@@ -133,12 +120,12 @@ void loop() {
                         {paso.comando}
                       </span>
                     </td>
-                    <td><strong style={{ fontFamily: 'monospace' }}>{paso.parametro || paso.salida || '-'}</strong></td>
+                    <td><strong style={{ fontFamily: 'monospace', color: 'var(--primary)' }}>{paso.parametro || paso.salida || '-'}</strong></td>
                     <td>{paso.etiqueta_completa || paso.codigo_visible || '-'}</td>
                     <td>{paso.nivel || '-'}</td>
                     <td>
                       {paso.patron ? (
-                        <span className="badge badge-warning" style={{ backgroundColor: '#fef08a', color: '#854d0e' }}>
+                        <span className="badge badge-warning">
                           🔊 {paso.patron}
                         </span>
                       ) : (
@@ -154,23 +141,11 @@ void loop() {
         </div>
       ) : (
         <div>
-          <div style={{
-            background: '#0f172a',
-            color: '#a7f3d0',
-            fontFamily: 'monospace',
-            fontSize: '0.84rem',
-            padding: '16px',
-            borderRadius: '6px',
-            maxHeight: '280px',
-            overflowY: 'auto',
-            lineHeight: '1.5',
-            whiteSpace: 'pre-wrap',
-            border: '1px solid #1e293b'
-          }}>
+          <div className="terminal-box" style={{ maxHeight: '280px', overflowY: 'auto', color: '#10b981', whiteSpace: 'pre-wrap' }}>
             {cppSnippet}
           </div>
-          <div style={{ marginTop: '10px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Info size={14} /> Sketch de referencia compatible con Arduino UNO / Mega para procesar comandos por puerto serie USB.
+          <div style={{ marginTop: '12px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Info size={14} style={{ color: 'var(--primary)' }} /> Sketch de referencia compatible con Arduino UNO / Mega para procesar comandos por puerto serie USB.
           </div>
         </div>
       )}
