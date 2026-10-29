@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any
 import json
 import math
 import heapq
+import itertools
 from datetime import datetime
 
 from database import get_db
@@ -73,7 +74,6 @@ def seed_mapa_si_vacio(db: Session):
                 columna = c_idx + 1
                 loc_id = f"LOC_R{fila}_C{columna}"
 
-                # Nivel por defecto distribuido para demostración
                 if (fila + columna) % 3 == 0:
                     nivel = "AMBOS"
                 elif (fila + columna) % 2 == 0:
@@ -117,19 +117,20 @@ def seed_mapa_si_vacio(db: Session):
         db.add(p)
         db.commit()
 
-# --- MODELO GEOMÉTRICO Y GRAFO DE PASILLOS TRANSITABLES ---
-# Coordenadas físicas en metros:
-# Ancho de pasillos y racks:
-# Pasillos verticales:
-# Aisle 0 (Izquierda de Col 1): x = 0.0 m
-# Aisle 1 (Entre Col 2 y Col 3): x = 2.4 m
-# Aisle 2 (Entre Col 4 y Col 5): x = 5.0 m
-# Aisle 3 (Derecha de Col 6 / Col 7): x = 7.4 m
-# Filas y Pasillos Horizontales:
-# Pasillo Superior (Cross Aisle Top): y = 0.0 m
-# Filas 1 a 9: y = 1.0 m a 9.0 m (1.0m por fila)
-# Pasillo Inferior (Cross Aisle Bottom): y = 10.0 m
-# Salidas: SALIDA_1 a (1.2, 11.0), SALIDA_2 a (6.2, 11.0)
+# --- GEOMETRÍA Y GRAFO FÍSICO DE PASILLOS TRANSITABLES ---
+# Coordenadas físicas reales en metros:
+# Pasillos longitudinales:
+# A0: x = 0.0 m (Pasillo exterior izquierdo)
+# Col 1: x = 0.5m, Col 2: x = 1.9m
+# A1: x = 2.4 m (Pasillo central 1)
+# Col 3: x = 2.9m, Col 4: x = 4.5m
+# A2: x = 5.0 m (Pasillo central 2)
+# Col 5: x = 5.5m, Col 6: x = 6.9m
+# A3: x = 7.4 m (Pasillo exterior derecho)
+# Col 7: x = 7.9m
+# Filas 1 a 9: y = 1.0m a 9.0m (paso de 1.0m por fila)
+# Cross aisles: TOP (y = 0.0m), BOTTOM (y = 10.0m)
+# Salidas: SALIDA_1 a (2.4, 11.0), SALIDA_2 a (4.8, 11.0) -> Distancia entre salidas = 2.4 m
 
 AISLE_X = {
     "A0": 0.0,
@@ -139,7 +140,6 @@ AISLE_X = {
 }
 
 def get_location_access_point(columna: int, fila: int) -> tuple[str, float, float]:
-    """Retorna el nodo del pasillo transitable más cercano y sus coordenadas (node_id, x, y)."""
     y = float(fila)
     if columna in [1, 2]:
         aisle = "A1" if columna == 2 else "A0"
@@ -147,13 +147,12 @@ def get_location_access_point(columna: int, fila: int) -> tuple[str, float, floa
         aisle = "A1" if columna == 3 else "A2"
     elif columna in [5, 6]:
         aisle = "A2" if columna == 5 else "A3"
-    else: # columna 7
+    else: # col 7
         aisle = "A3"
     x = AISLE_X[aisle]
     return f"{aisle}_Y{fila}", x, y
 
 def build_warehouse_graph():
-    """Construye el grafo transitatorio con nodos y distancias euclídeas reales."""
     graph = {}
     coords = {}
 
@@ -164,17 +163,14 @@ def build_warehouse_graph():
         graph.setdefault(u, []).append((v, dist))
         graph.setdefault(v, []).append((u, dist))
 
-    # Nodos de las salidas
-    coords["SALIDA_1"] = (1.2, 11.0)
-    coords["SALIDA_2"] = (6.2, 11.0)
+    coords["SALIDA_1"] = (2.4, 11.0)
+    coords["SALIDA_2"] = (4.8, 11.0)
 
-    # Nodos del pasillo inferior
     coords["BOTTOM_A0"] = (AISLE_X["A0"], 10.0)
     coords["BOTTOM_A1"] = (AISLE_X["A1"], 10.0)
     coords["BOTTOM_A2"] = (AISLE_X["A2"], 10.0)
     coords["BOTTOM_A3"] = (AISLE_X["A3"], 10.0)
 
-    # Conectar salidas al pasillo inferior
     add_edge("SALIDA_1", "BOTTOM_A0")
     add_edge("SALIDA_1", "BOTTOM_A1")
     add_edge("SALIDA_2", "BOTTOM_A2")
@@ -183,7 +179,6 @@ def build_warehouse_graph():
     add_edge("BOTTOM_A1", "BOTTOM_A2")
     add_edge("BOTTOM_A2", "BOTTOM_A3")
 
-    # Nodos del pasillo superior
     coords["TOP_A0"] = (AISLE_X["A0"], 0.0)
     coords["TOP_A1"] = (AISLE_X["A1"], 0.0)
     coords["TOP_A2"] = (AISLE_X["A2"], 0.0)
@@ -193,7 +188,6 @@ def build_warehouse_graph():
     add_edge("TOP_A1", "TOP_A2")
     add_edge("TOP_A2", "TOP_A3")
 
-    # Nodos a lo largo de los pasillos verticales (filas 1 a 9)
     for aisle, x in AISLE_X.items():
         prev_node = f"TOP_{aisle}"
         for row in range(1, 10):
@@ -208,7 +202,6 @@ def build_warehouse_graph():
 GRAPH, GRAPH_COORDS = build_warehouse_graph()
 
 def dijkstra_shortest_path(start_node: str, target_node: str):
-    """Calcula el camino más corto en el grafo de pasillos transitables."""
     if start_node not in GRAPH or target_node not in GRAPH:
         return float("inf"), []
 
@@ -241,19 +234,304 @@ def dijkstra_shortest_path(start_node: str, target_node: str):
 
     return distances[target_node], path
 
+def calcular_tiempo_pick(nivel: str, t_nivel1: float, t_nivel2: float) -> float:
+    if nivel == "NIVEL_1":
+        return t_nivel1
+    elif nivel == "NIVEL_2":
+        return t_nivel2
+    elif nivel == "AMBOS":
+        return t_nivel1 + t_nivel2
+    return t_nivel1
+
+def generar_instrucciones_arduino(trips: List[Dict[str, Any]]) -> Dict[str, Any]:
+    lines = []
+    pasos = []
+
+    for trip in trips:
+        trip_num = trip["numero_viaje"]
+        s_start = trip["salida_inicio"]
+        s_end = trip["salida_fin"]
+
+        lines.append(f"INICIAR_VIAJE;{trip_num};{s_start}")
+        pasos.append({
+            "comando": "INICIAR_VIAJE",
+            "parametro": f"VIAJE_{trip_num}",
+            "salida": s_start,
+            "descripcion": f"Inicio de viaje {trip_num} desde {s_start}"
+        })
+
+        for p in trip["pasos"]:
+            if p["tipo"] == "RECOGIDA":
+                loc_id = p["ubicacion_id"]
+                code_vis = p["codigo_ubicacion"]
+                etiqueta = p.get("etiqueta_completa", code_vis)
+                nivel = p["nivel"]
+                ord_v = p["orden_visita"]
+
+                lines.append(f"IR;{loc_id};LABEL;{etiqueta}")
+                pasos.append({
+                    "comando": "IR",
+                    "parametro": loc_id,
+                    "codigo_visible": code_vis,
+                    "etiqueta_completa": etiqueta,
+                    "orden_visita": ord_v,
+                    "descripcion": f"Ir a ubicación {etiqueta} ({loc_id})"
+                })
+
+                if nivel == "NIVEL_1":
+                    lines.append("RECOGER;NIVEL_1")
+                    lines.append("PITIDO;1")
+                    pasos.append({
+                        "comando": "RECOGER",
+                        "nivel": "NIVEL_1",
+                        "descripcion": "Recoger producto en 1er Nivel"
+                    })
+                    pasos.append({
+                        "comando": "PITIDO",
+                        "patron": "1_CORTO",
+                        "descripcion": "1 pitido corto (1er Nivel)"
+                    })
+                elif nivel == "NIVEL_2":
+                    lines.append("RECOGER;NIVEL_2")
+                    lines.append("PITIDO;2")
+                    pasos.append({
+                        "comando": "RECOGER",
+                        "nivel": "NIVEL_2",
+                        "descripcion": "Recoger producto en 2do Nivel"
+                    })
+                    pasos.append({
+                        "comando": "PITIDO",
+                        "patron": "2_CORTOS",
+                        "descripcion": "2 pitidos cortos consecutivos (2do Nivel)"
+                    })
+                elif nivel == "AMBOS":
+                    lines.append("RECOGER;NIVEL_1")
+                    lines.append("PITIDO;1")
+                    lines.append("PAUSA;0.5")
+                    lines.append("RECOGER;NIVEL_2")
+                    lines.append("PITIDO;1")
+                    pasos.append({
+                        "comando": "RECOGER",
+                        "nivel": "NIVEL_1",
+                        "descripcion": "Recoger producto en 1er Nivel"
+                    })
+                    pasos.append({
+                        "comando": "PITIDO",
+                        "patron": "1_CORTO",
+                        "descripcion": "1 pitido corto (1er Nivel)"
+                    })
+                    pasos.append({
+                        "comando": "PAUSA",
+                        "parametro": "0.5s",
+                        "descripcion": "Pausa breve entre niveles"
+                    })
+                    pasos.append({
+                        "comando": "RECOGER",
+                        "nivel": "NIVEL_2",
+                        "descripcion": "Recoger producto en 2do Nivel"
+                    })
+                    pasos.append({
+                        "comando": "PITIDO",
+                        "patron": "1_CORTO",
+                        "descripcion": "1 pitido corto (2do Nivel)"
+                    })
+
+        lines.append(f"REGRESAR;{s_end}")
+        pasos.append({
+            "comando": "REGRESAR",
+            "parametro": s_end,
+            "descripcion": f"Retorno a {s_end}"
+        })
+
+    return {
+        "comandos_texto": "\n".join(lines),
+        "pasos": pasos
+    }
+
+def construir_detalle_ruta(batch_locs: List[UbicacionMapa], c_solicitadas: Dict[str, float],
+                            salida_inicio: str, salida_fin: str,
+                            vel_ms: float, t_niv1: float, t_niv2: float):
+    trips = []
+    lista_despacho = []
+
+    chunk_size = 3
+    batches = [batch_locs[i:i + chunk_size] for i in range(0, len(batch_locs), chunk_size)]
+
+    total_dist_m = 0.0
+    total_travel_time_s = 0.0
+    total_pick_time_s = 0.0
+    global_order = 1
+
+    for trip_idx, batch in enumerate(batches):
+        trip_start_exit = salida_inicio if trip_idx == 0 else salida_fin
+        trip_end_exit = salida_fin
+
+        current_node = trip_start_exit
+        trip_waypoints = [current_node]
+        trip_dist_m = 0.0
+        trip_pick_time_s = 0.0
+        trip_steps = []
+
+        trip_steps.append({
+            "tipo": "INICIO_VIAJE",
+            "nodo": trip_start_exit,
+            "descripcion": f"Inicio de viaje {trip_idx + 1} desde {trip_start_exit}"
+        })
+
+        for u in batch:
+            target_node, _, _ = get_location_access_point(u.columna, u.fila)
+            segment_dist, path = dijkstra_shortest_path(current_node, target_node)
+
+            if path and len(path) > 1:
+                trip_waypoints.extend(path[1:])
+            trip_dist_m += segment_dist
+            current_node = target_node
+
+            p = u.producto
+            qty_req = c_solicitadas.get(u.id, 1.0)
+            qty_avail = p.stock_actual if p else 0.0
+            pick_t = calcular_tiempo_pick(u.nivel, t_niv1, t_niv2)
+            trip_pick_time_s += pick_t
+
+            desc_prod = p.descripcion if p else "N/A"
+            ref_prod = p.codigo if p else "N/A"
+
+            label_tag = f"{u.codigo_visible} [F{u.fila}-C{u.columna}]" if u.es_duplicado else u.codigo_visible
+
+            step_info = {
+                "tipo": "RECOGIDA",
+                "orden_visita": global_order,
+                "ubicacion_id": u.id,
+                "codigo_ubicacion": u.codigo_visible,
+                "etiqueta_completa": label_tag,
+                "access_node": target_node,
+                "fila": u.fila,
+                "columna": u.columna,
+                "producto_codigo": ref_prod,
+                "producto_descripcion": desc_prod,
+                "cantidad_solicitada": qty_req,
+                "cantidad_disponible": qty_avail,
+                "nivel": u.nivel,
+                "tiempo_recogida_s": pick_t,
+                "estado": "PENDIENTE",
+                "nota_advertencia": "Stock insuficiente" if qty_req > qty_avail else None
+            }
+            trip_steps.append(step_info)
+            lista_despacho.append(step_info)
+            global_order += 1
+
+        segment_dist, path = dijkstra_shortest_path(current_node, trip_end_exit)
+        if path and len(path) > 1:
+            trip_waypoints.extend(path[1:])
+        trip_dist_m += segment_dist
+
+        trip_steps.append({
+            "tipo": "FIN_VIAJE",
+            "nodo": trip_end_exit,
+            "descripcion": f"Retorno de viaje {trip_idx + 1} a {trip_end_exit}"
+        })
+
+        trip_travel_time_s = trip_dist_m / vel_ms if vel_ms > 0 else 0.0
+
+        trips.append({
+            "numero_viaje": trip_idx + 1,
+            "salida_inicio": trip_start_exit,
+            "salida_fin": trip_end_exit,
+            "num_ubicaciones": len(batch),
+            "distancia_m": round(trip_dist_m, 2),
+            "tiempo_desplazamiento_s": round(trip_travel_time_s, 2),
+            "tiempo_recogida_s": round(trip_pick_time_s, 2),
+            "tiempo_total_s": round(trip_travel_time_s + trip_pick_time_s, 2),
+            "waypoints": trip_waypoints,
+            "pasos": trip_steps
+        })
+
+        total_dist_m += trip_dist_m
+        total_travel_time_s += trip_travel_time_s
+        total_pick_time_s += trip_pick_time_s
+
+    total_time_s = total_travel_time_s + total_pick_time_s
+    instrucciones = generar_instrucciones_arduino(trips)
+
+    return {
+        "numero_viajes": len(trips),
+        "distancia_total_m": round(total_dist_m, 2),
+        "tiempo_desplazamiento_s": round(total_travel_time_s, 2),
+        "tiempo_recogida_s": round(total_pick_time_s, 2),
+        "tiempo_total_s": round(total_time_s, 2),
+        "tiempo_total_min": round(total_time_s / 60.0, 2),
+        "viajes": trips,
+        "lista_despacho": lista_despacho,
+        "instrucciones_arduino": instrucciones
+    }
+
+def optimizar_orden_ubicaciones(locs: List[UbicacionMapa], c_solic: Dict[str, float],
+                                 salida_inicio: str, salida_fin: str,
+                                 vel_ms: float, t_niv1: float, t_niv2: float) -> List[UbicacionMapa]:
+    """
+    Encuentra el orden óptimo de visita que minimiza el tiempo total.
+    Para conjuntos de hasta 8 ubicaciones, evalúa exhaustivamente todas las permutaciones.
+    Para más ubicaciones, utiliza heurística de vecino más cercano.
+    """
+    if len(locs) <= 1:
+        return list(locs)
+
+    if len(locs) <= 8:
+        best_perm = None
+        best_time = float("inf")
+
+        for perm in itertools.permutations(locs):
+            res = construir_detalle_ruta(
+                batch_locs=list(perm),
+                c_solicitadas=c_solic,
+                salida_inicio=salida_inicio,
+                salida_fin=salida_fin,
+                vel_ms=vel_ms,
+                t_niv1=t_niv1,
+                t_niv2=t_niv2
+            )
+            if res["tiempo_total_s"] < best_time:
+                best_time = res["tiempo_total_s"]
+                best_perm = list(perm)
+
+        return best_perm or list(locs)
+
+    unvisited = list(locs)
+    opt = []
+    curr_exit = salida_inicio
+
+    while unvisited:
+        curr_node = curr_exit if len(opt) % 3 == 0 else get_location_access_point(opt[-1].columna, opt[-1].fila)[0]
+        best_next = None
+        best_dist = float("inf")
+
+        for u in unvisited:
+            node, _, _ = get_location_access_point(u.columna, u.fila)
+            d, _ = dijkstra_shortest_path(curr_node, node)
+            if d < best_dist:
+                best_dist = d
+                best_next = u
+
+        if best_next:
+            opt.append(best_next)
+            unvisited.remove(best_next)
+
+    return opt
+
 @router.get("/ubicaciones")
 def get_ubicaciones(db: Session = Depends(get_db)):
     seed_mapa_si_vacio(db)
     ubicaciones = db.query(UbicacionMapa).order_by(UbicacionMapa.fila.asc(), UbicacionMapa.columna.asc()).all()
 
-    # Obtener maestro de productos para información ampliada
     res = []
     for u in ubicaciones:
         p = u.producto
         access_node, x, y = get_location_access_point(u.columna, u.fila)
+        etiqueta = f"{u.codigo_visible} [F{u.fila}-C{u.columna}]" if u.es_duplicado else u.codigo_visible
         res.append({
             "id": u.id,
             "codigo_visible": u.codigo_visible,
+            "etiqueta_completa": etiqueta,
             "fila": u.fila,
             "columna": u.columna,
             "nivel": u.nivel,
@@ -271,8 +549,8 @@ def get_ubicaciones(db: Session = Depends(get_db)):
     return {
         "esquema_referencia": GRID_SCHEMA,
         "dimensiones_referencia": {
-            "ancho_pasillo_m": 2.4,
-            "ancho_rack_m": 1.0,
+            "distancia_salidas_m": 2.4,
+            "ancho_pasillo_m": 1.0,
             "largo_modulo_m": 2.1,
             "alto_m": 5.0,
             "fondo_m": 2.0
@@ -352,129 +630,6 @@ def update_parametros(data: ParametrosUpdate, db: Session = Depends(get_db)):
         "salida_defecto_fin": p.salida_defecto_fin
     }}
 
-def calcular_tiempo_pick(nivel: str, t_nivel1: float, t_nivel2: float) -> float:
-    if nivel == "NIVEL_1":
-        return t_nivel1
-    elif nivel == "NIVEL_2":
-        return t_nivel2 # 3x nivel 1 por especificación
-    elif nivel == "AMBOS":
-        return t_nivel1 + t_nivel2 # Recogida en ambos niveles
-    return t_nivel1
-
-def construir_detalle_ruta(batch_locs: List[UbicacionMapa], c_solicitadas: Dict[str, float],
-                            salida_inicio: str, salida_fin: str,
-                            vel_ms: float, t_niv1: float, t_niv2: float):
-    """Construye viajes agrupando máximo 3 ubicaciones por viaje."""
-    trips = []
-    lista_despacho = []
-
-    # Dividir las ubicaciones en viajes de máximo 3 ubicaciones
-    chunk_size = 3
-    batches = [batch_locs[i:i + chunk_size] for i in range(0, len(batch_locs), chunk_size)]
-
-    total_dist_m = 0.0
-    total_travel_time_s = 0.0
-    total_pick_time_s = 0.0
-    global_order = 1
-
-    for trip_idx, batch in enumerate(batches):
-        trip_start_exit = salida_inicio if trip_idx == 0 else salida_fin
-        trip_end_exit = salida_fin
-
-        current_node = trip_start_exit
-        trip_waypoints = [current_node]
-        trip_dist_m = 0.0
-        trip_pick_time_s = 0.0
-        trip_steps = []
-
-        # Paso inicial desde salida
-        trip_steps.append({
-            "tipo": "INICIO_VIAJE",
-            "nodo": trip_start_exit,
-            "descripcion": f"Inicio de viaje {trip_idx + 1} desde {trip_start_exit}"
-        })
-
-        for u in batch:
-            target_node, _, _ = get_location_access_point(u.columna, u.fila)
-            segment_dist, path = dijkstra_shortest_path(current_node, target_node)
-
-            if path and len(path) > 1:
-                trip_waypoints.extend(path[1:])
-            trip_dist_m += segment_dist
-            current_node = target_node
-
-            p = u.producto
-            qty_req = c_solicitadas.get(u.id, 1.0)
-            qty_avail = p.stock_actual if p else 0.0
-            pick_t = calcular_tiempo_pick(u.nivel, t_niv1, t_niv2)
-            trip_pick_time_s += pick_t
-
-            desc_prod = p.descripcion if p else "N/A"
-            ref_prod = p.codigo if p else "N/A"
-
-            step_info = {
-                "tipo": "RECOGIDA",
-                "orden_visita": global_order,
-                "ubicacion_id": u.id,
-                "codigo_ubicacion": u.codigo_visible,
-                "access_node": target_node,
-                "producto_codigo": ref_prod,
-                "producto_descripcion": desc_prod,
-                "cantidad_solicitada": qty_req,
-                "cantidad_disponible": qty_avail,
-                "nivel": u.nivel,
-                "tiempo_recogida_s": pick_t,
-                "estado": "PENDIENTE",
-                "nota_advertencia": "Stock insuficiente" if qty_req > qty_avail else None
-            }
-            trip_steps.append(step_info)
-            lista_despacho.append(step_info)
-            global_order += 1
-
-        # Retorno a la salida
-        segment_dist, path = dijkstra_shortest_path(current_node, trip_end_exit)
-        if path and len(path) > 1:
-            trip_waypoints.extend(path[1:])
-        trip_dist_m += segment_dist
-
-        trip_steps.append({
-            "tipo": "FIN_VIAJE",
-            "nodo": trip_end_exit,
-            "descripcion": f"Retorno de viaje {trip_idx + 1} a {trip_end_exit}"
-        })
-
-        trip_travel_time_s = trip_dist_m / vel_ms if vel_ms > 0 else 0.0
-
-        trips.append({
-            "numero_viaje": trip_idx + 1,
-            "salida_inicio": trip_start_exit,
-            "salida_fin": trip_end_exit,
-            "num_ubicaciones": len(batch),
-            "distancia_m": round(trip_dist_m, 2),
-            "tiempo_desplazamiento_s": round(trip_travel_time_s, 2),
-            "tiempo_recogida_s": round(trip_pick_time_s, 2),
-            "tiempo_total_s": round(trip_travel_time_s + trip_pick_time_s, 2),
-            "waypoints": trip_waypoints,
-            "pasos": trip_steps
-        })
-
-        total_dist_m += trip_dist_m
-        total_travel_time_s += trip_travel_time_s
-        total_pick_time_s += trip_pick_time_s
-
-    total_time_s = total_travel_time_s + total_pick_time_s
-
-    return {
-        "numero_viajes": len(trips),
-        "distancia_total_m": round(total_dist_m, 2),
-        "tiempo_desplazamiento_s": round(total_travel_time_s, 2),
-        "tiempo_recogida_s": round(total_pick_time_s, 2),
-        "tiempo_total_s": round(total_time_s, 2),
-        "tiempo_total_min": round(total_time_s / 60.0, 2),
-        "viajes": trips,
-        "lista_despacho": lista_despacho
-    }
-
 @router.post("/calcular-ruta")
 def calcular_ruta(req: RutaRequest, db: Session = Depends(get_db)):
     seed_mapa_si_vacio(db)
@@ -482,11 +637,9 @@ def calcular_ruta(req: RutaRequest, db: Session = Depends(get_db)):
     if not req.ubicaciones_ids:
         raise HTTPException(status_code=400, detail="Debe seleccionar al menos una ubicación de recogida")
 
-    # Cargar ubicaciones seleccionadas
     ubics = db.query(UbicacionMapa).filter(UbicacionMapa.id.in_(req.ubicaciones_ids)).all()
     ubic_dict = {u.id: u for u in ubics}
 
-    # Mantener el orden inicial recibido
     locs_iniciales = [ubic_dict[uid] for uid in req.ubicaciones_ids if uid in ubic_dict]
 
     if not locs_iniciales:
@@ -509,28 +662,15 @@ def calcular_ruta(req: RutaRequest, db: Session = Depends(get_db)):
     )
 
     # 2. Ruta Optimizada
-    # Ordenamiento optimizado mediante heurística del vecino más cercano a lo largo de pasillos
-    unvisited = list(locs_iniciales)
-    locs_optimizadas = []
-    curr_exit = req.salida_inicio
-
-    while unvisited:
-        # Si empezamos un nuevo viaje (múltiplo de 3)
-        curr_node = curr_exit if len(locs_optimizadas) % 3 == 0 else get_location_access_point(locs_optimizadas[-1].columna, locs_optimizadas[-1].fila)[0]
-
-        best_next = None
-        best_dist = float("inf")
-
-        for u in unvisited:
-            node, _, _ = get_location_access_point(u.columna, u.fila)
-            d, _ = dijkstra_shortest_path(curr_node, node)
-            if d < best_dist:
-                best_dist = d
-                best_next = u
-
-        if best_next:
-            locs_optimizadas.append(best_next)
-            unvisited.remove(best_next)
+    locs_optimizadas = optimizar_orden_ubicaciones(
+        locs=locs_iniciales,
+        c_solic=c_solic,
+        salida_inicio=req.salida_inicio,
+        salida_fin=req.salida_fin,
+        vel_ms=vel_ms,
+        t_niv1=t_niv1,
+        t_niv2=t_niv2
+    )
 
     res_optimizada = construir_detalle_ruta(
         batch_locs=locs_optimizadas,
@@ -559,7 +699,7 @@ def calcular_ruta(req: RutaRequest, db: Session = Depends(get_db)):
             "distancia_ahorrada_m": dist_ahorrada_m,
             "tiempo_ahorrado_s": tiempo_ahorrado_s,
             "porcentaje_mejora_distancia": round((dist_ahorrada_m / res_inicial["distancia_total_m"] * 100) if res_inicial["distancia_total_m"] > 0 else 0, 1),
-            "criterio_optimizacion": "La optimización utiliza la heurística de Vecino Más Cercano (Nearest Neighbor) calculada sobre las conexiones reales del grafo de pasillos transitables y agrupa estrictamente hasta 3 ubicaciones por viaje para minimizar la distancia total recorrida."
+            "criterio_optimizacion": "La optimización evalúa las secuencias de recorrido sobre el grafo físico del almacén y agrupa estrictamente hasta 3 ubicaciones físicas por viaje para garantizar el tiempo total mínimo (desplazamiento + recogida)."
         },
         "graph_nodes_coords": GRAPH_COORDS
     }

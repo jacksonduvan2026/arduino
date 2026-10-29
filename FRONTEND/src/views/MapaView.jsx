@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   MapPin, Play, Pause, RotateCcw, XCircle, Sliders, Layers,
   Bot, FastForward, CheckCircle2, AlertTriangle, ArrowRight,
-  Package, Info, Save
+  Package, Info, Save, Trash2, Volume2
 } from 'lucide-react';
 import { api } from '../services/api';
 import { MapaAlmacenSVG } from '../components/MapaAlmacenSVG';
 import { ListaDespacho } from '../components/ListaDespacho';
 import { ComparacionRutas } from '../components/ComparacionRutas';
+import { InstruccionesArduino } from '../components/InstruccionesArduino';
 
 export function MapaView() {
   const [loading, setLoading] = useState(true);
@@ -37,6 +38,7 @@ export function MapaView() {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [currentWaypointNode, setCurrentWaypointNode] = useState('SALIDA_1');
   const [roverCoords, setRoverCoords] = useState(null);
+  const [activeBeepSignal, setActiveBeepSignal] = useState(null);
 
   // Tiempos en tiempo real de la simulación
   const [simTimeElapsedS, setSimTimeElapsedS] = useState(0);
@@ -72,7 +74,6 @@ export function MapaView() {
         setSalidaFin(paramRes.salida_defecto_fin || 'SALIDA_1');
       }
 
-      // Cargar productos para el selector de edición
       const prodRes = await api.getInventario({ limit: 100 });
       if (prodRes && prodRes.items) {
         setProductos(prodRes.items);
@@ -90,21 +91,19 @@ export function MapaView() {
     );
   };
 
-  const handleSelectAllInRow = (rowNum) => {
-    const locsInRow = ubicaciones.filter((u) => u.fila === rowNum).map((u) => u.id);
-    const allSelected = locsInRow.every((id) => selectedLocIds.includes(id));
-
-    if (allSelected) {
-      setSelectedLocIds((prev) => prev.filter((id) => !locsInRow.includes(id)));
-    } else {
-      setSelectedLocIds((prev) => Array.from(new Set([...prev, ...locsInRow])));
-    }
-  };
-
   const handleClearSelection = () => {
     setSelectedLocIds([]);
     setRutaCalculada(null);
     cancelarSimulacion();
+  };
+
+  const handleQuickAssignLevel = async (locId, nivel) => {
+    try {
+      await api.updateUbicacionMapa(locId, { nivel });
+      cargarDatos();
+    } catch (err) {
+      alert('Error al asignar el nivel: ' + err.message);
+    }
   };
 
   const handleCalcularRuta = async () => {
@@ -129,6 +128,46 @@ export function MapaView() {
       alert('Error al calcular la ruta: ' + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Reproducción de pitidos de sonido con Web Audio API
+  const triggerAudioBeep = (nivel) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+
+      const beep = (delayMs, durationMs) => {
+        setTimeout(() => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, ctx.currentTime);
+          gain.gain.setValueAtTime(0.15, ctx.currentTime);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + durationMs / 1000);
+        }, delayMs);
+      };
+
+      if (nivel === 'NIVEL_1') {
+        beep(0, 150);
+        setActiveBeepSignal('1 Pitido Corto');
+      } else if (nivel === 'NIVEL_2') {
+        beep(0, 150);
+        beep(220, 150);
+        setActiveBeepSignal('2 Pitidos Cortos');
+      } else if (nivel === 'AMBOS') {
+        beep(0, 150);
+        beep(350, 150);
+        setActiveBeepSignal('1 Pitido + Pausa + 1 Pitido');
+      }
+
+      setTimeout(() => setActiveBeepSignal(null), 1200);
+    } catch (e) {
+      console.warn('Audio no soportado:', e);
     }
   };
 
@@ -186,20 +225,19 @@ export function MapaView() {
     setSimPickTimeS(0);
     setCurrentWaypointNode(salidaInicio);
     setRoverCoords(null);
+    setActiveBeepSignal(null);
     if (simTimerRef.current) clearInterval(simTimerRef.current);
   };
 
   const ejecutarBucleSimulacion = () => {
     if (simTimerRef.current) clearInterval(simTimerRef.current);
 
-    // Intervalo de actualización en ms (ej: 100ms reales ajustado por multiplicador)
-    const intervalMs = 100;
+    const intervalMs = 120;
     const stepDurationSec = (intervalMs / 1000) * simSpeedMultiplier;
 
     simTimerRef.current = setInterval(() => {
       setSimTimeElapsedS((prev) => prev + stepDurationSec);
 
-      // Avanzar forma simplificada de simulación paso a paso a través de waypoints y tareas
       setCurrentStepIndex((prevStep) => {
         if (!activeWaypoints || prevStep >= activeWaypoints.length - 1) {
           clearInterval(simTimerRef.current);
@@ -211,9 +249,9 @@ export function MapaView() {
         const currentNode = activeWaypoints[nextStep];
         setCurrentWaypointNode(currentNode);
 
-        // Avanzar índice de tarea de despacho
         const currentTask = activeListaDespacho[currentTaskIndex];
         if (currentTask && currentTask.access_node === currentNode) {
+          triggerAudioBeep(currentTask.nivel);
           setCurrentTaskIndex((tIdx) => Math.min(tIdx + 1, activeListaDespacho.length - 1));
           setSimPickTimeS((prev) => prev + (currentTask.tiempo_recogida_s || 15));
         } else {
@@ -262,7 +300,7 @@ export function MapaView() {
             Mapa de Almacén, Picking y Simulación Rover
           </h2>
           <p style={{ fontSize: '0.88rem', color: '#64748b', marginTop: '4px' }}>
-            Layout de almacén interactivo de 9 filas por 7 columnas, picking de productos y simulador virtual del rover Arduino.
+            Layout de almacén interactivo con geometría fiel (7 columnas x 9 filas), clasificaciones de niveles y simulador Rover Arduino.
           </p>
         </div>
       </div>
@@ -280,7 +318,7 @@ export function MapaView() {
           <div className="card-header" style={{ marginBottom: '12px' }}>
             <h3 className="card-title" style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Layers size={18} className="text-primary" />
-              Vista General de Ubicaciones ({ubicaciones.length} posiciones)
+              Vista General del Almacén ({ubicaciones.length} posiciones)
             </h3>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button className="btn btn-outline btn-sm" onClick={handleClearSelection} disabled={selectedLocIds.length === 0}>
@@ -359,7 +397,7 @@ export function MapaView() {
                   onChange={(e) => setTiempoPickNivel1S(parseFloat(e.target.value) || 15.0)}
                 />
                 <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
-                  * Nivel 2 tomará {tiempoPickNivel1S * 3}s (3 veces el 1er nivel)
+                  * Nivel 2 tomará {tiempoPickNivel1S * 3}s (3x primer nivel)
                 </span>
               </div>
 
@@ -379,6 +417,13 @@ export function MapaView() {
                 {isSimulating ? (isPaused ? 'Pausado' : 'Simulando') : 'Inactivo'}
               </span>
             </div>
+
+            {/* Señal acústica visual durante simulación */}
+            {activeBeepSignal && (
+              <div style={{ backgroundColor: '#ca8a04', color: '#ffffff', padding: '6px 12px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Volume2 size={16} className="pulse-animation" /> {activeBeepSignal}
+              </div>
+            )}
 
             {/* Selector de modo de ruta */}
             {rutaCalculada && (
@@ -489,12 +534,17 @@ export function MapaView() {
         isSimulating={isSimulating}
       />
 
+      {/* Panel de Instrucciones para Arduino */}
+      {rutaCalculada && (
+        <InstruccionesArduino rutaCalculada={rutaCalculada} modoRuta={modoRuta} />
+      )}
+
       {/* Tabla de Ubicaciones y Edición */}
       <div className="card" style={{ marginTop: '24px' }}>
         <div className="card-header">
           <h3 className="card-title" style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Package size={18} className="text-primary" />
-            Configuración y Asignación de Ubicaciones del Almacén
+            Configuración de Estanterías y Clasificación por Nivel
           </h3>
         </div>
 
@@ -505,22 +555,40 @@ export function MapaView() {
                 <th>ID Interno</th>
                 <th>Código Visible</th>
                 <th>Posición (Fila/Col)</th>
-                <th>Nivel Recogida</th>
+                <th>Clasificación de Nivel</th>
                 <th>Producto Asignado</th>
-                <th>Stock Actual</th>
                 <th>Inconsistencia</th>
-                <th>Acción</th>
+                <th>Acción Rápida Nivel</th>
+                <th>Editar</th>
               </tr>
             </thead>
             <tbody>
               {ubicaciones.map((u) => (
                 <tr key={u.id} style={{ backgroundColor: u.es_duplicado ? '#fff7ed' : 'transparent' }}>
                   <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#64748b' }}>{u.id}</td>
-                  <td><strong>{u.codigo_visible}</strong></td>
+                  <td>
+                    <strong>{u.codigo_visible}</strong>
+                    {u.es_duplicado && (
+                      <span style={{ fontSize: '0.72rem', color: '#c2410c', display: 'block' }}>
+                        [Fila {u.fila}, Col {u.columna}]
+                      </span>
+                    )}
+                  </td>
                   <td>Fila {u.fila}, Col {u.columna}</td>
                   <td>
-                    <span className={`badge ${u.nivel === 'NIVEL_1' ? 'badge-warning' : u.nivel === 'NIVEL_2' ? 'badge-danger' : 'badge-secondary'}`}>
-                      {u.nivel}
+                    <span className={`badge ${
+                      u.nivel === 'NIVEL_1'
+                        ? 'badge-warning'
+                        : u.nivel === 'NIVEL_2'
+                        ? 'badge-danger'
+                        : u.nivel === 'AMBOS'
+                        ? 'badge'
+                        : 'badge-secondary'
+                    }`} style={{
+                      backgroundColor: u.nivel === 'AMBOS' ? '#ffedd5' : undefined,
+                      color: u.nivel === 'AMBOS' ? '#9a3412' : undefined
+                    }}>
+                      {u.nivel === 'NIVEL_1' ? '1er Nivel (Amarillo)' : u.nivel === 'NIVEL_2' ? '2do Nivel (Rojo)' : u.nivel === 'AMBOS' ? 'Ambos (Naranja)' : 'Sin Nivel (Blanco)'}
                     </span>
                   </td>
                   <td>
@@ -529,15 +597,40 @@ export function MapaView() {
                       <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{u.producto_descripcion}</div>
                     </div>
                   </td>
-                  <td>{u.stock_actual}</td>
                   <td>
                     {u.es_duplicado ? (
                       <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <AlertTriangle size={12} /> Código Duplicado
+                        <AlertTriangle size={12} /> Duplicado ({u.codigo_visible})
                       </span>
                     ) : (
                       <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Normal</span>
                     )}
+                  </td>
+                  <td>
+                    {/* Botones de Asignación Rápida de Color / Nivel */}
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        title="Asignar 1er Nivel (Amarillo)"
+                        style={{ border: '1px solid #ca8a04', background: '#fef08a', color: '#854d0e', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 'bold' }}
+                        onClick={() => handleQuickAssignLevel(u.id, 'NIVEL_1')}
+                      >
+                        N1
+                      </button>
+                      <button
+                        title="Asignar 2do Nivel (Rojo)"
+                        style={{ border: '1px solid #dc2626', background: '#fecaca', color: '#991b1b', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 'bold' }}
+                        onClick={() => handleQuickAssignLevel(u.id, 'NIVEL_2')}
+                      >
+                        N2
+                      </button>
+                      <button
+                        title="Asignar Ambos Niveles (Naranja)"
+                        style={{ border: '1px solid #ea580c', background: '#ffedd5', color: '#9a3412', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 'bold' }}
+                        onClick={() => handleQuickAssignLevel(u.id, 'AMBOS')}
+                      >
+                        Ambos
+                      </button>
+                    </div>
                   </td>
                   <td>
                     <button className="btn btn-outline btn-sm" onClick={() => handleOpenEditModal(u)}>
@@ -622,7 +715,7 @@ export function MapaView() {
               Puntos de Integración con Rover Arduino Físico (Fase Posterior)
             </h4>
             <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: '1.5' }}>
-              Esta simulación se ejecuta de forma completamente virtual en el navegador. La arquitectura está preparada para enviar la secuencia de waypoints y tramos por puerto serie USB al Arduino (`/api/arduino/comando`) cuando se confirme la integración física con motores y sensores IR.
+              Esta simulación se ejecuta de forma completamente virtual en el navegador. La arquitectura está preparada para enviar la secuencia de comandos por puerto serie USB al Arduino (`/api/arduino/comando`) cuando se confirme la integración física con motores y sensores IR.
             </p>
           </div>
         </div>
