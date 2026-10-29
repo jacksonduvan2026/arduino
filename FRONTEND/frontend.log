@@ -1,8 +1,9 @@
 
 > inventario-rover-frontend@2.0.0 dev
-> vite --host 127.0.0.1 --port 3000
+> vite
 
 
-  VITE v5.4.21  ready in 257 ms
+  VITE v5.4.21  ready in 298 ms
 
-  ➜  Local:   http://127.0.0.1:3000/
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: use --host to expose

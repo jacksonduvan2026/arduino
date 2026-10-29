@@ -146,18 +146,60 @@ AISLE_X = {
     "A4": 10.0
 }
 
-def get_location_access_point(columna: int, fila: int) -> tuple[str, float, float]:
-    y = float(fila)
-    if columna in [1, 2]:
+def get_location_matrix_info(columna: int, fila: int) -> Dict[str, Any]:
+    if columna == 1:
+        bloque = 1
+        cara = "UNICA"
         aisle = "A1"
-    elif columna in [3, 4]:
+        pasillo_nombre = "Pasillo 2 (A1)"
+    elif columna == 2:
+        bloque = 2
+        cara = "IZQUIERDA"
+        aisle = "A1"
+        pasillo_nombre = "Pasillo 2 (A1)"
+    elif columna == 3:
+        bloque = 2
+        cara = "DERECHA"
         aisle = "A2"
-    elif columna in [5, 6]:
+        pasillo_nombre = "Pasillo 3 (A2)"
+    elif columna == 4:
+        bloque = 3
+        cara = "IZQUIERDA"
+        aisle = "A2"
+        pasillo_nombre = "Pasillo 3 (A2)"
+    elif columna == 5:
+        bloque = 3
+        cara = "DERECHA"
         aisle = "A3"
-    else: # columna 7
+        pasillo_nombre = "Pasillo 4 (A3)"
+    elif columna == 6:
+        bloque = 4
+        cara = "IZQUIERDA"
+        aisle = "A3"
+        pasillo_nombre = "Pasillo 4 (A3)"
+    else: # columna == 7
+        bloque = 4
+        cara = "DERECHA"
         aisle = "A4"
+        pasillo_nombre = "Pasillo 5 (A4)"
+
     x = AISLE_X[aisle]
-    return f"{aisle}_Y{fila}", x, y
+    y = float(fila)
+    access_node = f"{aisle}_Y{fila}"
+
+    return {
+        "bloque": bloque,
+        "cara_estanteria": cara,
+        "pasillo_acceso": pasillo_nombre,
+        "access_node": access_node,
+        "x_m": x,
+        "y_m": y,
+        "zona_transitable": False
+    }
+
+def get_location_access_point(columna: int, fila: int) -> tuple[str, float, float]:
+    info = get_location_matrix_info(columna, fila)
+    return info["access_node"], info["x_m"], info["y_m"]
 
 def build_warehouse_graph():
     graph = {}
@@ -170,8 +212,11 @@ def build_warehouse_graph():
         graph.setdefault(u, []).append((v, dist))
         graph.setdefault(v, []).append((u, dist))
 
-    coords["SALIDA_1"] = (2.4, 11.0)
-    coords["SALIDA_2"] = (7.4, 11.0)
+    # Alineación exacta de las dos salidas con los pasillos exteriores:
+    # Salida 1 -> Alineada con Pasillo 1 (A0, X = 0.0 m)
+    # Salida 2 -> Alineada con Pasillo 5 (A4, X = 10.0 m)
+    coords["SALIDA_1"] = (AISLE_X["A0"], 11.0)
+    coords["SALIDA_2"] = (AISLE_X["A4"], 11.0)
 
     coords["BOTTOM_A0"] = (AISLE_X["A0"], 10.0)
     coords["BOTTOM_A1"] = (AISLE_X["A1"], 10.0)
@@ -179,12 +224,8 @@ def build_warehouse_graph():
     coords["BOTTOM_A3"] = (AISLE_X["A3"], 10.0)
     coords["BOTTOM_A4"] = (AISLE_X["A4"], 10.0)
 
+    # Conexiones exclusivas ortogonales sin trazados diagonales:
     add_edge("SALIDA_1", "BOTTOM_A0")
-    add_edge("SALIDA_1", "BOTTOM_A1")
-    add_edge("SALIDA_1", "BOTTOM_A2")
-
-    add_edge("SALIDA_2", "BOTTOM_A2")
-    add_edge("SALIDA_2", "BOTTOM_A3")
     add_edge("SALIDA_2", "BOTTOM_A4")
 
     add_edge("BOTTOM_A0", "BOTTOM_A1")
@@ -541,12 +582,16 @@ def get_ubicaciones(db: Session = Depends(get_db)):
     res = []
     for u in ubicaciones:
         p = u.producto
-        access_node, x, y = get_location_access_point(u.columna, u.fila)
+        mat_info = get_location_matrix_info(u.columna, u.fila)
         etiqueta = f"{u.codigo_visible} [F{u.fila}-C{u.columna}]" if u.es_duplicado else u.codigo_visible
         res.append({
             "id": u.id,
             "codigo_visible": u.codigo_visible,
             "etiqueta_completa": etiqueta,
+            "bloque": mat_info["bloque"],
+            "cara_estanteria": mat_info["cara_estanteria"],
+            "pasillo_acceso": mat_info["pasillo_acceso"],
+            "zona_transitable": mat_info["zona_transitable"],
             "fila": u.fila,
             "columna": u.columna,
             "nivel": u.nivel,
@@ -555,20 +600,24 @@ def get_ubicaciones(db: Session = Depends(get_db)):
             "stock_actual": p.stock_actual if p else 0.0,
             "es_duplicado": u.es_duplicado,
             "nota_inconsistencia": u.nota_inconsistencia,
-            "access_node": access_node,
-            "x_m": x,
-            "y_m": y,
+            "access_node": mat_info["access_node"],
+            "x_m": mat_info["x_m"],
+            "y_m": mat_info["y_m"],
             "updated_at": u.updated_at.strftime("%Y-%m-%d %H:%M") if u.updated_at else ""
         })
 
     return {
         "esquema_referencia": GRID_SCHEMA,
         "dimensiones_referencia": {
-            "distancia_salidas_m": 2.4,
+            "espacio_libre_superior_m": 2.0,
+            "espacio_libre_inferior_m": 5.0,
+            "profundidad_seccion_rack_m": 2.4,
             "ancho_pasillo_m": 1.0,
-            "largo_modulo_m": 2.1,
-            "alto_m": 5.0,
-            "fondo_m": 2.0
+            "ancho_estanteria_doble_m": 2.1,
+            "ancho_estanteria_simple_m": 1.05,
+            "distancia_salidas_m": 10.0,
+            "pasillos_transitables": 5,
+            "bloques_estanterias": 4
         },
         "inconsistencias_notificadas": DUPLICATE_CODES,
         "total_ubicaciones": len(res),
