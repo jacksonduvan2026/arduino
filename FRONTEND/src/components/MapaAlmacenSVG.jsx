@@ -110,13 +110,13 @@ export function MapaAlmacenSVG({
             <span style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#ffffff', border: '1px solid #94a3b8' }}></span> Blanca (Defecto)
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#fef08a', border: '1px solid #ca8a04' }}></span> Nivel 1 (15s)
+            <span style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#fef08a', border: '1px solid #ca8a04' }}></span> Amarillo (N1, 3t)
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#fecaca', border: '1px solid #dc2626' }}></span> Nivel 2 (45s)
+            <span style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#fecaca', border: '1px solid #dc2626' }}></span> Rojo (N2, 1t)
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#ffedd5', border: '1px solid #ea580c' }}></span> Ambos (60s)
+            <span style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#ffedd5', border: '1px solid #ea580c' }}></span> Naranja (N1+N2, 4t)
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '12px', height: '12px', borderRadius: '50%', border: '2px solid #ff1744', backgroundColor: '#ff1744' }}></span> Seleccionada para Ruta

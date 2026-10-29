@@ -34,7 +34,9 @@ def test_1_ubicacion_amarilla_nivel_1():
     assert res.status_code == 200
     data = res.json()
     opt = data["ruta_optimizada"]
-    assert opt["tiempo_recogida_s"] == 15.0
+    # Amarillo = solo nivel N1, tiempo de recogida de 3t (3 * 15s = 45s)
+    assert opt["tiempo_recogida_t"] == 3.0
+    assert opt["tiempo_recogida_s"] == 45.0
     assert opt["numero_viajes"] == 1
 
     # Verificar instrucciones de Arduino
@@ -60,7 +62,9 @@ def test_2_ubicacion_roja_nivel_2():
     assert res.status_code == 200
     data = res.json()
     opt = data["ruta_optimizada"]
-    assert opt["tiempo_recogida_s"] == 45.0 # 3x 15s
+    # Rojo = solo nivel N2, tiempo de recogida de 1t (1 * 15s = 15s)
+    assert opt["tiempo_recogida_t"] == 1.0
+    assert opt["tiempo_recogida_s"] == 15.0
 
     instr = opt["instrucciones_arduino"]
     assert "RECOGER;NIVEL_2" in instr["comandos_texto"]
@@ -84,7 +88,9 @@ def test_3_ubicacion_naranja_ambos_niveles():
     assert res.status_code == 200
     data = res.json()
     opt = data["ruta_optimizada"]
-    assert opt["tiempo_recogida_s"] == 60.0 # 15s + 45s = 60s
+    # Naranja = requiere N1 y N2 como una sola operación lógica de 4t (4 * 15s = 60s)
+    assert opt["tiempo_recogida_t"] == 4.0
+    assert opt["tiempo_recogida_s"] == 60.0
 
     instr = opt["instrucciones_arduino"]
     # Debe contener 2 operaciones de recogida y patrón con pausa breve
@@ -211,14 +217,30 @@ def test_12_ubicaciones_sin_nivel_blancas():
     assert u_data["nivel"] == "SIN_NIVEL"
 
 def test_13_regla_tiempos_recogida_t_y_validacion_referencia():
-    # Probar las reglas obligatorias de picking (Rojo N1=1t, Amarillo N2=3t, Naranja=4t)
+    # Probar las reglas obligatorias de picking:
+    # Rojo: solo nivel N2, tiempo de recogida de 1t.
+    # Amarillo: solo nivel N1, tiempo de recogida de 3t.
+    # Naranja: requiere N1 y N2 como una sola operación lógica de 4t.
     from routers.mapa_picking import calcular_costo_recogida_t
-    c1 = calcular_costo_recogida_t(None, "NIVEL_1")
-    assert c1["tiempo_t"] == 1.0
-    c2 = calcular_costo_recogida_t(None, "NIVEL_2")
-    assert c2["tiempo_t"] == 3.0
-    c3 = calcular_costo_recogida_t(None, "AMBOS")
+    c1 = calcular_costo_recogida_t("AMARILLO", "NIVEL_1")
+    assert c1["tiempo_t"] == 3.0
+    assert c1["advertencia"] is None
+
+    c2 = calcular_costo_recogida_t("ROJO", "NIVEL_2")
+    assert c2["tiempo_t"] == 1.0
+    assert c2["advertencia"] is None
+
+    c3 = calcular_costo_recogida_t("NARANJA", "AMBOS")
     assert c3["tiempo_t"] == 4.0
+    assert c3["advertencia"] is None
+
+    # Advertencias de descalificación o desajuste de nivel/categoría
+    c_invalid = calcular_costo_recogida_t("ROJO", "NIVEL_1")
+    assert c_invalid["tiempo_t"] == 1.0
+    assert c_invalid["advertencia"] is not None
+
+    c_sin_nivel = calcular_costo_recogida_t(None, "SIN_NIVEL")
+    assert c_sin_nivel["advertencia"] is not None
 
     # Probar endpoint calcular-ruta con 9 ubicaciones únicas
     res = client.post("/api/mapa/calcular-ruta", json={
