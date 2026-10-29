@@ -7,13 +7,14 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 # Importar base de datos y routers
-from database import engine, Base, get_db
+from database import engine, Base, get_db, ejecutar_migraciones_seguras
 from models import Venta
 from services.import_service import importar_datos_excel
 from routers import dashboard, inventario, ventas, productos_incluir, cronograma, reportes, arduino, mapa_picking
 
-# Crear las tablas en la base de datos si no existen
+# Crear las tablas en la base de datos si no existen y ejecutar migraciones no destructivas
 Base.metadata.create_all(bind=engine)
+ejecutar_migraciones_seguras()
 
 app = FastAPI(
     title="Sistema de Inventario Cíclico + Arduino Rover",
