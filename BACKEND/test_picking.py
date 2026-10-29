@@ -172,3 +172,40 @@ def test_10_coincidencia_instrucciones_arduino():
     assert "INICIAR_VIAJE;1;SALIDA_1" in instr["comandos_texto"]
     assert "REGRESAR;SALIDA_2" in instr["comandos_texto"]
     assert len(instr["pasos"]) > 0
+
+def test_11_geometria_cinco_pasillos_y_seleccion_auto_salida():
+    # 1. Verificar endpoint de ubicaciones para total de 63 posiciones y 5 pasillos
+    res = client.get("/api/mapa/ubicaciones").json()
+    assert res["total_ubicaciones"] == 63
+
+    # Verificar que cada posición tiene ID único y que los duplicados 22 y 35 están marcados
+    ubics = res["ubicaciones"]
+    ids = set(u["id"] for u in ubics)
+    assert len(ids) == 63
+
+    dup_22 = [u for u in ubics if u["codigo_visible"] == "22" and u["es_duplicado"]]
+    dup_35 = [u for u in ubics if u["codigo_visible"] == "35" and u["es_duplicado"]]
+    assert len(dup_22) > 0
+    assert len(dup_35) > 0
+
+    # 2. Selección automática de salida (modo AUTO)
+    res_auto = client.post("/api/mapa/calcular-ruta", json={
+        "ubicaciones_ids": ["LOC_R1_C7"], # Ubicación en la extrema derecha (columna 7)
+        "salida_inicio": "AUTO",
+        "salida_fin": "AUTO"
+    }).json()
+
+    # Para una ubicación en la columna 7 (derecha), la mejor salida elegida automáticamente debe ser SALIDA_2
+    assert res_auto["salida_inicio"] == "SALIDA_2"
+    assert res_auto["salida_fin"] == "SALIDA_2"
+
+def test_12_ubicaciones_sin_nivel_blancas():
+    db = SessionLocal()
+    u = db.query(UbicacionMapa).filter(UbicacionMapa.id == "LOC_R5_C5").first()
+    u.nivel = "SIN_NIVEL"
+    db.commit()
+    db.close()
+
+    res = client.get("/api/mapa/ubicaciones").json()
+    u_data = next(x for x in res["ubicaciones"] if x["id"] == "LOC_R5_C5")
+    assert u_data["nivel"] == "SIN_NIVEL"

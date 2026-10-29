@@ -95,7 +95,7 @@ class UbicacionMapa(Base):
     codigo_visible = Column(String, index=True) # e.g. "18"
     fila = Column(Integer, index=True) # 1 to 9
     columna = Column(Integer, index=True) # 1 to 7
-    nivel = Column(String, default="NIVEL_1") # NIVEL_1, NIVEL_2, AMBOS
+    nivel = Column(String, default="SIN_NIVEL") # NIVEL_1, NIVEL_2, AMBOS, SIN_NIVEL
     producto_codigo = Column(String, ForeignKey("productos.codigo"), nullable=True, index=True)
     es_duplicado = Column(Boolean, default=False)
     nota_inconsistencia = Column(String, nullable=True)
