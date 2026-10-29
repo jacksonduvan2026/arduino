@@ -242,7 +242,7 @@ def test_13_regla_tiempos_recogida_t_y_validacion_referencia():
     c_sin_nivel = calcular_costo_recogida_t(None, "SIN_NIVEL")
     assert c_sin_nivel["advertencia"] is not None
 
-    # Probar endpoint calcular-ruta con 9 ubicaciones únicas
+    # Probar endpoint calcular-ruta con 9 ubicaciones únicas que identifican el pedido de referencia
     res = client.post("/api/mapa/calcular-ruta", json={
         "ubicaciones_ids": ["LOC_R8_C7", "LOC_R3_C7", "LOC_R6_C6", "LOC_R5_C5", "LOC_R2_C6", "LOC_R4_C3", "LOC_R2_C4", "LOC_R6_C2", "LOC_R8_C1"],
         "salida_inicio": "SALIDA_1",
@@ -258,6 +258,61 @@ def test_13_regla_tiempos_recogida_t_y_validacion_referencia():
     assert ref_info["tiempo_recogida_t"] == 20.0
     assert ref_info["numero_viajes"] == 4
 
+    opt = res["ruta_optimizada"]
+    assert opt["numero_viajes"] == 4
+    assert len(opt["lista_despacho"]) == 12
+    assert opt["tiempo_recogida_t"] == 20.0
+
     dif = res["validacion_referencia"]["diferencias"]
     assert dif["diferencia_distancia_abs_m"] > 0
     assert "explicacion_discrepancia" in dif
+
+def test_14_pedido_referencia_12_lineas_4_viajes():
+    # Petición con las 12 líneas de recogida del pedido de referencia documentado
+    res = client.post("/api/mapa/calcular-ruta", json={
+        "lineas": [
+            {"ubicacion_id": "LOC_R8_C7", "nivel": "NIVEL_1"},
+            {"ubicacion_id": "LOC_R8_C7", "nivel": "NIVEL_1"},
+            {"ubicacion_id": "LOC_R3_C7", "nivel": "NIVEL_2"},
+            {"ubicacion_id": "LOC_R6_C6", "nivel": "NIVEL_2"},
+            {"ubicacion_id": "LOC_R5_C5", "nivel": "NIVEL_2"},
+            {"ubicacion_id": "LOC_R2_C6", "nivel": "NIVEL_2"},
+            {"ubicacion_id": "LOC_R4_C3", "nivel": "NIVEL_1"},
+            {"ubicacion_id": "LOC_R4_C3", "nivel": "NIVEL_2"},
+            {"ubicacion_id": "LOC_R2_C4", "nivel": "NIVEL_2"},
+            {"ubicacion_id": "LOC_R6_C2", "nivel": "NIVEL_2"},
+            {"ubicacion_id": "LOC_R8_C1", "nivel": "NIVEL_1"},
+            {"ubicacion_id": "LOC_R8_C1", "nivel": "NIVEL_2"}
+        ],
+        "salida_inicio": "SALIDA_1",
+        "salida_fin": "SALIDA_1",
+        "velocidad_rover_ms": 1.0,
+        "tiempo_pick_nivel_1_s": 1.0,
+        "tiempo_pick_nivel_2_s": 3.0
+    })
+    assert res.status_code == 200
+    data = res.json()
+    opt = data["ruta_optimizada"]
+
+    # Verificar que el resultado de la ruta produce exactamente 4 viajes, 12 líneas y 20t
+    assert opt["numero_viajes"] == 4
+    assert len(opt["lista_despacho"]) == 12
+    assert opt["tiempo_recogida_t"] == 20.0
+
+    # Verificar los cuatro grupos de viaje establecidos en la documentación
+    grupos_esperados = [
+        ["60", "60", "55"],
+        ["41", "44", "49"],
+        ["25", "25", "21"],
+        ["7", "4", "4"]
+    ]
+
+    for idx, v in enumerate(opt["viajes"]):
+        pos_obtenidas = [p["codigo_ubicacion"] for p in v["pasos"] if p["tipo"] == "RECOGIDA"]
+        assert pos_obtenidas == grupos_esperados[idx]
+
+    # Comprobar tiempos t individuales por viaje
+    assert opt["viajes"][0]["tiempo_recogida_t"] == 7.0
+    assert opt["viajes"][1]["tiempo_recogida_t"] == 3.0
+    assert opt["viajes"][2]["tiempo_recogida_t"] == 5.0
+    assert opt["viajes"][3]["tiempo_recogida_t"] == 5.0
