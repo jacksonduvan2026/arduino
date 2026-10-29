@@ -7,6 +7,8 @@ export function MapaAlmacenSVG({
   activeRouteWaypoints,
   roverPositionNode,
   roverCoords,
+  roverStatus,
+  roverCurrentTask,
   isSimulating,
   startExit,
   endExit
@@ -14,23 +16,23 @@ export function MapaAlmacenSVG({
   const svgWidth = 840;
   const svgHeight = 640;
 
-  // Mapa de coordenadas X para columnas 1 a 7 (grupos de estanterías y pasillos)
-  // Col 1, Col 2 | Pasillo 1 | Col 3, Col 4 | Pasillo 2 | Col 5, Col 6 | Pasillo 3 | Col 7
+  // Distribución de 5 pasillos transitables (A0..A4) y 4 bloques de estanterías (1 simple, 3 dobles)
   const colXMap = {
-    1: 80,
-    2: 150,
-    3: 260,
-    4: 330,
-    5: 440,
-    6: 510,
-    7: 620
+    1: 90,   // Bloque 1 (Simple)
+    2: 210,  // Bloque 2 (Cara Izquierda)
+    3: 270,  // Bloque 2 (Cara Derecha)
+    4: 390,  // Bloque 3 (Cara Izquierda)
+    5: 450,  // Bloque 3 (Cara Derecha)
+    6: 570,  // Bloque 4 (Cara Izquierda)
+    7: 630   // Bloque 4 (Cara Derecha)
   };
 
   const aisleXMap = {
-    A0: 40,
-    A1: 205,
-    A2: 385,
-    A3: 565
+    A0: 40,   // Pasillo 1 (Exterior izquierdo)
+    A1: 150,  // Pasillo 2 (Entre Bloque 1 y Bloque 2)
+    A2: 330,  // Pasillo 3 (Entre Bloque 2 y Bloque 3)
+    A3: 510,  // Pasillo 4 (Entre Bloque 3 y Bloque 4)
+    A4: 690   // Pasillo 5 (Exterior derecho)
   };
 
   const rowYMap = {
@@ -50,8 +52,8 @@ export function MapaAlmacenSVG({
   const exitY = 570;
 
   const exitXMap = {
-    SALIDA_1: 120,
-    SALIDA_2: 475
+    SALIDA_1: 150,
+    SALIDA_2: 510
   };
 
   const getWayPointSvgCoords = (nodeId) => {
@@ -84,8 +86,9 @@ export function MapaAlmacenSVG({
         return { fill: '#fecaca', stroke: '#dc2626', text: '#991b1b', label: 'Rojo (2do Nivel)' };
       case 'AMBOS':
         return { fill: '#ffedd5', stroke: '#ea580c', text: '#9a3412', label: 'Naranja (Ambos Niveles)' };
+      case 'SIN_NIVEL':
       default:
-        return { fill: '#ffffff', stroke: '#475569', text: '#0f172a', label: 'Estantería Blanca (Sin clasificar)' };
+        return { fill: '#ffffff', stroke: '#94a3b8', text: '#0f172a', label: 'Blanca (Sin nivel asignado)' };
     }
   };
 
@@ -121,7 +124,7 @@ export function MapaAlmacenSVG({
         </div>
 
         <div style={{ fontSize: '0.75rem', color: '#94a3b8', background: '#1e293b', padding: '4px 10px', borderRadius: '4px', border: '1px solid #334155' }}>
-          Dist. Salidas: 2,4m | Pasillo: 1,0m | Módulo: 2,1m | 5,0m x 2,0m
+          Ref. Física: 5 Pasillos Transitables | 4 Bloques (1 Simple, 3 Dobles) | Libres: Sup. 2m / Inf. 5m
         </div>
       </div>
 
@@ -129,35 +132,40 @@ export function MapaAlmacenSVG({
         {/* Fondo del almacén */}
         <rect x="10" y="10" width={svgWidth - 20} height={svgHeight - 20} fill="#1e293b" rx="8" stroke="#334155" strokeWidth="2" />
 
+        {/* Referencia Espacio Libre Superior (2m) */}
+        <text x="380" y="18" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="bold">
+          ESPACIO LIBRE SUPERIOR (REFERENCIA 2 METROS)
+        </text>
+
         {/* Pasillos Transitables - Grafo de Referencia */}
         <g stroke="#334155" strokeWidth="2" strokeDasharray="4,4">
-          <line x1={aisleXMap.A0} y1={topAisleY} x2={aisleXMap.A3} y2={topAisleY} />
-          <line x1={aisleXMap.A0} y1={bottomAisleY} x2={aisleXMap.A3} y2={bottomAisleY} />
+          <line x1={aisleXMap.A0} y1={topAisleY} x2={aisleXMap.A4} y2={topAisleY} />
+          <line x1={aisleXMap.A0} y1={bottomAisleY} x2={aisleXMap.A4} y2={bottomAisleY} />
 
           {Object.entries(aisleXMap).map(([aisleKey, xVal]) => (
             <line key={aisleKey} x1={xVal} y1={topAisleY} x2={xVal} y2={bottomAisleY} />
           ))}
 
-          <line x1={exitXMap.SALIDA_1} y1={exitY} x2={aisleXMap.A0} y2={bottomAisleY} stroke="#10b981" strokeWidth="2" />
           <line x1={exitXMap.SALIDA_1} y1={exitY} x2={aisleXMap.A1} y2={bottomAisleY} stroke="#10b981" strokeWidth="2" />
-          <line x1={exitXMap.SALIDA_2} y1={exitY} x2={aisleXMap.A2} y2={bottomAisleY} stroke="#3b82f6" strokeWidth="2" />
           <line x1={exitXMap.SALIDA_2} y1={exitY} x2={aisleXMap.A3} y2={bottomAisleY} stroke="#3b82f6" strokeWidth="2" />
         </g>
 
-        {/* Grupos de Estanterías (Fondo visual delimitador) */}
-        {/* Grupo 1: Col 1 - Col 2 */}
-        <rect x="70" y="45" width="90" height="430" fill="#0f172a" rx="4" stroke="#475569" strokeWidth="1" opacity="0.6" />
-        {/* Grupo 2: Col 3 - Col 4 */}
-        <rect x="250" y="45" width="90" height="430" fill="#0f172a" rx="4" stroke="#475569" strokeWidth="1" opacity="0.6" />
-        {/* Grupo 3: Col 5 - Col 6 */}
-        <rect x="430" y="45" width="90" height="430" fill="#0f172a" rx="4" stroke="#475569" strokeWidth="1" opacity="0.6" />
-        {/* Grupo 4: Col 7 */}
-        <rect x="610" y="45" width="45" height="430" fill="#0f172a" rx="4" stroke="#475569" strokeWidth="1" opacity="0.6" />
+        {/* 4 Bloques de Estanterías (Estructura física) */}
+        {/* Bloque 1: Estantería Simple Izquierda (Col 1) */}
+        <rect x="68" y="45" width="44" height="430" fill="#0f172a" rx="4" stroke="#64748b" strokeWidth="1.5" opacity="0.8" />
+        {/* Bloque 2: Estantería Doble (Col 2 & Col 3) */}
+        <rect x="188" y="45" width="104" height="430" fill="#0f172a" rx="4" stroke="#64748b" strokeWidth="1.5" opacity="0.8" />
+        {/* Bloque 3: Estantería Doble (Col 4 & Col 5) */}
+        <rect x="368" y="45" width="104" height="430" fill="#0f172a" rx="4" stroke="#64748b" strokeWidth="1.5" opacity="0.8" />
+        {/* Bloque 4: Estantería Doble Derecha (Col 6 & Col 7) */}
+        <rect x="548" y="45" width="104" height="430" fill="#0f172a" rx="4" stroke="#64748b" strokeWidth="1.5" opacity="0.8" />
 
-        {/* Separadores de Pasillos */}
-        <text x="205" y="35" textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="bold">PASILLO 1 (1,0m)</text>
-        <text x="385" y="35" textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="bold">PASILLO 2 (1,0m)</text>
-        <text x="565" y="35" textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="bold">PASILLO 3 (1,0m)</text>
+        {/* Etiquetas de Pasillos Transitables */}
+        <text x={aisleXMap.A0} y="34" textAnchor="middle" fill="#38bdf8" fontSize="9" fontWeight="bold">PASILLO 1</text>
+        <text x={aisleXMap.A1} y="34" textAnchor="middle" fill="#38bdf8" fontSize="9" fontWeight="bold">PASILLO 2</text>
+        <text x={aisleXMap.A2} y="34" textAnchor="middle" fill="#38bdf8" fontSize="9" fontWeight="bold">PASILLO 3</text>
+        <text x={aisleXMap.A3} y="34" textAnchor="middle" fill="#38bdf8" fontSize="9" fontWeight="bold">PASILLO 4</text>
+        <text x={aisleXMap.A4} y="34" textAnchor="middle" fill="#38bdf8" fontSize="9" fontWeight="bold">PASILLO 5</text>
 
         {/* Polyline de la Ruta Calculada */}
         {routePolylinePoints && (
@@ -245,44 +253,49 @@ export function MapaAlmacenSVG({
           );
         })}
 
-        {/* Salidas en la Parte Inferior */}
-        {/* SALIDA 1 */}
-        <g transform={`translate(${exitXMap.SALIDA_1 - 50}, ${exitY - 18})`}>
+        {/* Referencia Espacio Libre Inferior (5m) */}
+        <text x="380" y="495" textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="bold">
+          ESPACIO LIBRE INFERIOR (REFERENCIA 5 METROS)
+        </text>
+
+        {/* Puertas de Salida en la pared inferior (ambas etiquetadas SALIDA) */}
+        {/* Puerta SALIDA 1 */}
+        <g transform={`translate(${exitXMap.SALIDA_1 - 45}, ${exitY - 18})`}>
           <rect
             x="0"
             y="0"
-            width="100"
+            width="90"
             height="36"
             rx="6"
             fill={startExit === 'SALIDA_1' ? '#059669' : '#064e3b'}
             stroke="#10b981"
             strokeWidth="2"
           />
-          <text x="50" y="22" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">
-            SALIDA 1
+          <text x="45" y="22" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">
+            SALIDA
           </text>
         </g>
 
-        {/* Acotación de distancia 2.4 m entre salidas */}
-        <g transform={`translate(${exitXMap.SALIDA_1 + 50}, ${exitY - 5})`}>
-          <line x1="0" y1="0" x2="255" y2="0" stroke="#94a3b8" strokeWidth="1" strokeDasharray="3,3" />
-          <text x="127" y="-4" textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="bold">2.4 m entre salidas</text>
+        {/* Acotación entre salidas */}
+        <g transform={`translate(${exitXMap.SALIDA_1 + 45}, ${exitY - 5})`}>
+          <line x1="0" y1="0" x2="270" y2="0" stroke="#94a3b8" strokeWidth="1" strokeDasharray="3,3" />
+          <text x="135" y="-4" textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="bold">2.4 m entre salidas</text>
         </g>
 
-        {/* SALIDA 2 */}
-        <g transform={`translate(${exitXMap.SALIDA_2 - 50}, ${exitY - 18})`}>
+        {/* Puerta SALIDA 2 */}
+        <g transform={`translate(${exitXMap.SALIDA_2 - 45}, ${exitY - 18})`}>
           <rect
             x="0"
             y="0"
-            width="100"
+            width="90"
             height="36"
             rx="6"
             fill={startExit === 'SALIDA_2' ? '#2563eb' : '#1e3a8a'}
             stroke="#3b82f6"
             strokeWidth="2"
           />
-          <text x="50" y="22" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">
-            SALIDA 2
+          <text x="45" y="22" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">
+            SALIDA
           </text>
         </g>
 
@@ -292,11 +305,26 @@ export function MapaAlmacenSVG({
             transform={`translate(${currentRoverCoords.x}, ${currentRoverCoords.y})`}
             style={{ transition: 'all 0.3s ease-out' }}
           >
-            <circle cx="0" cy="0" r="18" fill="#38bdf8" opacity="0.3" className="pulse-animation" />
-            <circle cx="0" cy="0" r="12" fill="#0284c7" stroke="#ffffff" strokeWidth="2" />
-            <path d="M -5 -5 L 5 -5 L 5 5 L -5 5 Z" fill="#ffffff" />
-            <text x="0" y="22" textAnchor="middle" fill="#38bdf8" fontSize="10" fontWeight="bold">
-              ROVER
+            {/* Anillo y resplandor según estado (Detenido/Recogiendo vs Moviéndose) */}
+            {roverStatus === 'RECOGIENDO' ? (
+              <>
+                <circle cx="0" cy="0" r="24" fill="#f59e0b" opacity="0.4" className="pulse-animation" />
+                <circle cx="0" cy="0" r="15" fill="#ef4444" stroke="#ffffff" strokeWidth="2.5" />
+                <text x="0" y="4" textAnchor="middle" fill="#ffffff" fontSize="10" fontWeight="bold">⏹</text>
+                <rect x="-45" y="-38" width="90" height="18" rx="4" fill="#0f172a" stroke="#f59e0b" strokeWidth="1" />
+                <text x="0" y="-25" textAnchor="middle" fill="#f59e0b" fontSize="9" fontWeight="bold">
+                  PARADA - PICKING
+                </text>
+              </>
+            ) : (
+              <>
+                <circle cx="0" cy="0" r="18" fill="#38bdf8" opacity="0.3" className="pulse-animation" />
+                <circle cx="0" cy="0" r="12" fill="#0284c7" stroke="#ffffff" strokeWidth="2" />
+                <path d="M -4 -4 L 4 -4 L 4 4 L -4 4 Z" fill="#ffffff" />
+              </>
+            )}
+            <text x="0" y="22" textAnchor="middle" fill={roverStatus === 'RECOGIENDO' ? '#f59e0b' : '#38bdf8'} fontSize="10" fontWeight="bold">
+              {roverStatus === 'RECOGIENDO' ? 'DETENIDO' : 'ROVER'}
             </text>
           </g>
         )}

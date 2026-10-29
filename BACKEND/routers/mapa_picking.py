@@ -34,7 +34,7 @@ DUPLICATE_CODES = {
 
 class UbicacionUpdate(BaseModel):
     codigo_visible: Optional[str] = None
-    nivel: Optional[str] = None # NIVEL_1, NIVEL_2, AMBOS
+    nivel: Optional[str] = None # NIVEL_1, NIVEL_2, AMBOS, SIN_NIVEL
     producto_codigo: Optional[str] = None
 
 class ParametrosUpdate(BaseModel):
@@ -47,8 +47,8 @@ class ParametrosUpdate(BaseModel):
 class RutaRequest(BaseModel):
     ubicaciones_ids: List[str]
     cantidades_solicitadas: Optional[Dict[str, float]] = None # {ubicacion_id: cantidad}
-    salida_inicio: str = "SALIDA_1" # SALIDA_1 o SALIDA_2
-    salida_fin: str = "SALIDA_1"
+    salida_inicio: str = "AUTO" # AUTO, SALIDA_1 o SALIDA_2
+    salida_fin: str = "AUTO" # AUTO, SALIDA_1 o SALIDA_2
     velocidad_rover_ms: Optional[float] = 1.0
     tiempo_pick_nivel_1_s: Optional[float] = 15.0
     tiempo_pick_nivel_2_s: Optional[float] = 45.0
@@ -74,12 +74,8 @@ def seed_mapa_si_vacio(db: Session):
                 columna = c_idx + 1
                 loc_id = f"LOC_R{fila}_C{columna}"
 
-                if (fila + columna) % 3 == 0:
-                    nivel = "AMBOS"
-                elif (fila + columna) % 2 == 0:
-                    nivel = "NIVEL_2"
-                else:
-                    nivel = "NIVEL_1"
+                # Por defecto, todas las ubicaciones no tienen nivel asignado (apariencia blanca)
+                nivel = "SIN_NIVEL"
 
                 es_dup = False
                 nota_inc = None
@@ -118,37 +114,48 @@ def seed_mapa_si_vacio(db: Session):
         db.commit()
 
 # --- GEOMETRÍA Y GRAFO FÍSICO DE PASILLOS TRANSITABLES ---
-# Coordenadas físicas reales en metros:
-# Pasillos longitudinales:
-# A0: x = 0.0 m (Pasillo exterior izquierdo)
-# Col 1: x = 0.5m, Col 2: x = 1.9m
-# A1: x = 2.4 m (Pasillo central 1)
-# Col 3: x = 2.9m, Col 4: x = 4.5m
-# A2: x = 5.0 m (Pasillo central 2)
-# Col 5: x = 5.5m, Col 6: x = 6.9m
-# A3: x = 7.4 m (Pasillo exterior derecho)
-# Col 7: x = 7.9m
-# Filas 1 a 9: y = 1.0m a 9.0m (paso de 1.0m por fila)
-# Cross aisles: TOP (y = 0.0m), BOTTOM (y = 10.0m)
-# Salidas: SALIDA_1 a (2.4, 11.0), SALIDA_2 a (4.8, 11.0) -> Distancia entre salidas = 2.4 m
+# Distribución física exacta:
+# 5 pasillos transitables (A0, A1, A2, A3, A4)
+# 4 bloques de estanterías (Bloque 1 simple, Bloques 2, 3, 4 dobles)
+#
+# Pasillos transitables:
+# A0: Pasillo 1 (Exterior izquierdo) - x = 0.0 m
+# Bloque 1 (Simple): Col 1
+# A1: Pasillo 2 (Entre Bloque 1 y Bloque 2) - x = 2.4 m
+# Bloque 2 (Doble): Col 2 (cara izq) y Col 3 (cara der)
+# A2: Pasillo 3 (Entre Bloque 2 y Bloque 3) - x = 5.0 m
+# Bloque 3 (Doble): Col 4 (cara izq) y Col 5 (cara der)
+# A3: Pasillo 4 (Entre Bloque 3 y Bloque 4) - x = 7.4 m
+# Bloque 4 (Doble): Col 6 (cara izq) y Col 7 (cara der)
+# A4: Pasillo 5 (Exterior derecho) - x = 10.0 m
+#
+# Puntos de acceso por columna:
+# Columna 1 (Bloque 1 simple) -> Accesible desde Pasillo 2 (A1)
+# Columna 2 (Bloque 2 cara izq) -> Accesible desde Pasillo 2 (A1)
+# Columna 3 (Bloque 2 cara der) -> Accesible desde Pasillo 3 (A2)
+# Columna 4 (Bloque 3 cara izq) -> Accesible desde Pasillo 3 (A2)
+# Columna 5 (Bloque 3 cara der) -> Accesible desde Pasillo 4 (A3)
+# Columna 6 (Bloque 4 cara izq) -> Accesible desde Pasillo 4 (A3)
+# Columna 7 (Bloque 4 cara der) -> Accesible desde Pasillo 5 (A4)
 
 AISLE_X = {
     "A0": 0.0,
     "A1": 2.4,
     "A2": 5.0,
-    "A3": 7.4
+    "A3": 7.4,
+    "A4": 10.0
 }
 
 def get_location_access_point(columna: int, fila: int) -> tuple[str, float, float]:
     y = float(fila)
     if columna in [1, 2]:
-        aisle = "A1" if columna == 2 else "A0"
+        aisle = "A1"
     elif columna in [3, 4]:
-        aisle = "A1" if columna == 3 else "A2"
+        aisle = "A2"
     elif columna in [5, 6]:
-        aisle = "A2" if columna == 5 else "A3"
-    else: # col 7
         aisle = "A3"
+    else: # columna 7
+        aisle = "A4"
     x = AISLE_X[aisle]
     return f"{aisle}_Y{fila}", x, y
 
@@ -164,29 +171,37 @@ def build_warehouse_graph():
         graph.setdefault(v, []).append((u, dist))
 
     coords["SALIDA_1"] = (2.4, 11.0)
-    coords["SALIDA_2"] = (4.8, 11.0)
+    coords["SALIDA_2"] = (7.4, 11.0)
 
     coords["BOTTOM_A0"] = (AISLE_X["A0"], 10.0)
     coords["BOTTOM_A1"] = (AISLE_X["A1"], 10.0)
     coords["BOTTOM_A2"] = (AISLE_X["A2"], 10.0)
     coords["BOTTOM_A3"] = (AISLE_X["A3"], 10.0)
+    coords["BOTTOM_A4"] = (AISLE_X["A4"], 10.0)
 
     add_edge("SALIDA_1", "BOTTOM_A0")
     add_edge("SALIDA_1", "BOTTOM_A1")
+    add_edge("SALIDA_1", "BOTTOM_A2")
+
     add_edge("SALIDA_2", "BOTTOM_A2")
     add_edge("SALIDA_2", "BOTTOM_A3")
+    add_edge("SALIDA_2", "BOTTOM_A4")
+
     add_edge("BOTTOM_A0", "BOTTOM_A1")
     add_edge("BOTTOM_A1", "BOTTOM_A2")
     add_edge("BOTTOM_A2", "BOTTOM_A3")
+    add_edge("BOTTOM_A3", "BOTTOM_A4")
 
     coords["TOP_A0"] = (AISLE_X["A0"], 0.0)
     coords["TOP_A1"] = (AISLE_X["A1"], 0.0)
     coords["TOP_A2"] = (AISLE_X["A2"], 0.0)
     coords["TOP_A3"] = (AISLE_X["A3"], 0.0)
+    coords["TOP_A4"] = (AISLE_X["A4"], 0.0)
 
     add_edge("TOP_A0", "TOP_A1")
     add_edge("TOP_A1", "TOP_A2")
     add_edge("TOP_A2", "TOP_A3")
+    add_edge("TOP_A3", "TOP_A4")
 
     for aisle, x in AISLE_X.items():
         prev_node = f"TOP_{aisle}"
@@ -569,8 +584,8 @@ def update_ubicacion(loc_id: str, data: UbicacionUpdate, db: Session = Depends(g
     if data.codigo_visible is not None:
         u.codigo_visible = data.codigo_visible
     if data.nivel is not None:
-        if data.nivel not in ["NIVEL_1", "NIVEL_2", "AMBOS"]:
-            raise HTTPException(status_code=400, detail="Nivel inválido. Debe ser NIVEL_1, NIVEL_2 o AMBOS")
+        if data.nivel not in ["NIVEL_1", "NIVEL_2", "AMBOS", "SIN_NIVEL"]:
+            raise HTTPException(status_code=400, detail="Nivel inválido. Debe ser NIVEL_1, NIVEL_2, AMBOS o SIN_NIVEL")
         u.nivel = data.nivel
     if data.producto_codigo is not None:
         if data.producto_codigo != "":
@@ -650,44 +665,64 @@ def calcular_ruta(req: RutaRequest, db: Session = Depends(get_db)):
     t_niv1 = req.tiempo_pick_nivel_1_s or 15.0
     t_niv2 = req.tiempo_pick_nivel_2_s or 45.0
 
-    # 1. Ruta Inicial (secuencial)
-    res_inicial = construir_detalle_ruta(
-        batch_locs=locs_iniciales,
-        c_solicitadas=c_solic,
-        salida_inicio=req.salida_inicio,
-        salida_fin=req.salida_fin,
-        vel_ms=vel_ms,
-        t_niv1=t_niv1,
-        t_niv2=t_niv2
-    )
+    # Determinación automática de la mejor salida si salida_inicio o salida_fin es AUTO
+    posibles_salidas = ["SALIDA_1", "SALIDA_2"]
 
-    # 2. Ruta Optimizada
-    locs_optimizadas = optimizar_orden_ubicaciones(
-        locs=locs_iniciales,
-        c_solic=c_solic,
-        salida_inicio=req.salida_inicio,
-        salida_fin=req.salida_fin,
-        vel_ms=vel_ms,
-        t_niv1=t_niv1,
-        t_niv2=t_niv2
-    )
+    s_start_candidates = posibles_salidas if req.salida_inicio in ["AUTO", None, ""] else [req.salida_inicio]
+    s_end_candidates = posibles_salidas if req.salida_fin in ["AUTO", None, ""] else [req.salida_fin]
 
-    res_optimizada = construir_detalle_ruta(
-        batch_locs=locs_optimizadas,
-        c_solicitadas=c_solic,
-        salida_inicio=req.salida_inicio,
-        salida_fin=req.salida_fin,
-        vel_ms=vel_ms,
-        t_niv1=t_niv1,
-        t_niv2=t_niv2
-    )
+    best_start = s_start_candidates[0]
+    best_end = s_end_candidates[0]
+    best_optimizada = None
+    best_inicial = None
+    best_time = float("inf")
+
+    for s_start in s_start_candidates:
+        for s_end in s_end_candidates:
+            locs_opt = optimizar_orden_ubicaciones(
+                locs=locs_iniciales,
+                c_solic=c_solic,
+                salida_inicio=s_start,
+                salida_fin=s_end,
+                vel_ms=vel_ms,
+                t_niv1=t_niv1,
+                t_niv2=t_niv2
+            )
+            res_opt = construir_detalle_ruta(
+                batch_locs=locs_opt,
+                c_solicitadas=c_solic,
+                salida_inicio=s_start,
+                salida_fin=s_end,
+                vel_ms=vel_ms,
+                t_niv1=t_niv1,
+                t_niv2=t_niv2
+            )
+            if res_opt["tiempo_total_s"] < best_time:
+                best_time = res_opt["tiempo_total_s"]
+                best_start = s_start
+                best_end = s_end
+                best_optimizada = res_opt
+                best_inicial = construir_detalle_ruta(
+                    batch_locs=locs_iniciales,
+                    c_solicitadas=c_solic,
+                    salida_inicio=s_start,
+                    salida_fin=s_end,
+                    vel_ms=vel_ms,
+                    t_niv1=t_niv1,
+                    t_niv2=t_niv2
+                )
+
+    res_inicial = best_inicial
+    res_optimizada = best_optimizada
 
     dist_ahorrada_m = round(res_inicial["distancia_total_m"] - res_optimizada["distancia_total_m"], 2)
     tiempo_ahorrado_s = round(res_inicial["tiempo_total_s"] - res_optimizada["tiempo_total_s"], 2)
 
     return {
-        "salida_inicio": req.salida_inicio,
-        "salida_fin": req.salida_fin,
+        "salida_inicio": best_start,
+        "salida_fin": best_end,
+        "salida_inicio_solicitada": req.salida_inicio,
+        "salida_fin_solicitada": req.salida_fin,
         "velocidad_rover_ms": vel_ms,
         "restricciones": {
             "max_ubicaciones_por_viaje": 3,
@@ -699,7 +734,7 @@ def calcular_ruta(req: RutaRequest, db: Session = Depends(get_db)):
             "distancia_ahorrada_m": dist_ahorrada_m,
             "tiempo_ahorrado_s": tiempo_ahorrado_s,
             "porcentaje_mejora_distancia": round((dist_ahorrada_m / res_inicial["distancia_total_m"] * 100) if res_inicial["distancia_total_m"] > 0 else 0, 1),
-            "criterio_optimizacion": "La optimización evalúa las secuencias de recorrido sobre el grafo físico del almacén y agrupa estrictamente hasta 3 ubicaciones físicas por viaje para garantizar el tiempo total mínimo (desplazamiento + recogida)."
+            "criterio_optimizacion": "La optimización evalúa las secuencias de recorrido sobre el grafo físico de 5 pasillos transitables del almacén, selecciona automáticamente la mejor puerta de SALIDA para minimizar el tiempo total (desplazamiento + recogida) y agrupa hasta 3 ubicaciones físicas por viaje."
         },
         "graph_nodes_coords": GRAPH_COORDS
     }

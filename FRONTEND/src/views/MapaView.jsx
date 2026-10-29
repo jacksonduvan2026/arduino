@@ -23,27 +23,29 @@ export function MapaView() {
   // Parámetros de simulación
   const [velocidadRoverMs, setVelocidadRoverMs] = useState(1.0);
   const [tiempoPickNivel1S, setTiempoPickNivel1S] = useState(15.0);
-  const [salidaInicio, setSalidaInicio] = useState('SALIDA_1');
-  const [salidaFin, setSalidaFin] = useState('SALIDA_1');
+  const [salidaInicio, setSalidaInicio] = useState('AUTO');
+  const [salidaFin, setSalidaFin] = useState('AUTO');
   const [simSpeedMultiplier, setSimSpeedMultiplier] = useState(2); // 1x, 2x, 5x, 10x
 
   // Resultado de la ruta
   const [rutaCalculada, setRutaCalculada] = useState(null);
   const [modoRuta, setModoRuta] = useState('optimizada'); // 'optimizada' o 'inicial'
 
-  // Estados de Simulación
+  // Estados de Simulación Físicamente Coherente
   const [isSimulating, setIsSimulating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
+  const [roverStatus, setRoverStatus] = useState('INACTIVO'); // 'DESPLAZANDOSE', 'RECOGIENDO', 'INACTIVO'
   const [currentWaypointNode, setCurrentWaypointNode] = useState('SALIDA_1');
   const [roverCoords, setRoverCoords] = useState(null);
   const [activeBeepSignal, setActiveBeepSignal] = useState(null);
+  const [currentPickingTask, setCurrentPickingTask] = useState(null);
+  const [pickingTimeRemaining, setPickingTimeRemaining] = useState(0);
 
   // Tiempos en tiempo real de la simulación
   const [simTimeElapsedS, setSimTimeElapsedS] = useState(0);
   const [simTravelTimeS, setSimTravelTimeS] = useState(0);
   const [simPickTimeS, setSimPickTimeS] = useState(0);
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
 
   // Modal para editar ubicación
   const [editingLoc, setEditingLoc] = useState(null);
@@ -184,18 +186,76 @@ export function MapaView() {
 
   const activeListaDespacho = activeRoute ? activeRoute.lista_despacho : [];
 
+  // Construcción de la secuencia de simulación física paso a paso (Movimiento + Paradas obligatorias de recogida)
+  const construirSecuenciaSimulacion = () => {
+    if (!activeRoute || !activeRoute.viajes) return [];
+
+    const simEvents = [];
+    activeRoute.viajes.forEach((trip) => {
+      const waypoints = trip.waypoints || [];
+      const pickingSteps = (trip.pasos || []).filter((p) => p.tipo === 'RECOGIDA');
+      let pickIdx = 0;
+
+      for (let i = 0; i < waypoints.length; i++) {
+        const node = waypoints[i];
+        simEvents.push({
+          type: 'MOVE',
+          node: node,
+          description: `Desplazándose a punto de pasillo ${node}`
+        });
+
+        // Si este nodo coincide con el nodo de acceso de la siguiente tarea de recogida
+        if (pickIdx < pickingSteps.length && pickingSteps[pickIdx].access_node === node) {
+          const task = pickingSteps[pickIdx];
+          simEvents.push({
+            type: 'PICK_STOP',
+            node: node,
+            task: task,
+            duration_s: task.tiempo_recogida_s || 15.0,
+            nivel: task.nivel,
+            etiqueta: task.etiqueta_completa || task.codigo_ubicacion,
+            description: `PARADA FÍSICA: Recogiendo en ${task.etiqueta_completa || task.codigo_ubicacion} (Nivel ${task.nivel === 'NIVEL_1' ? '1 [15s]' : task.nivel === 'NIVEL_2' ? '2 [45s - 3x]' : 'Ambos [60s]'})`
+          });
+          pickIdx++;
+        }
+      }
+    });
+
+    return simEvents;
+  };
+
+  // Referencias para el estado interno del bucle de simulación
+  const simStateRef = useRef({
+    events: [],
+    eventIdx: 0,
+    pickTimerS: 0,
+    isPicking: false
+  });
+
   const iniciarSimulacion = () => {
     if (!activeRoute) {
       alert('Primero debes calcular la ruta de recogida.');
       return;
     }
+
+    const events = construirSecuenciaSimulacion();
+    if (events.length === 0) return;
+
+    simStateRef.current = {
+      events: events,
+      eventIdx: 0,
+      pickTimerS: 0,
+      isPicking: false
+    };
+
     setIsSimulating(true);
     setIsPaused(false);
-    setCurrentStepIndex(0);
-    setCurrentTaskIndex(0);
+    setRoverStatus('DESPLAZANDOSE');
     setSimTimeElapsedS(0);
     setSimTravelTimeS(0);
     setSimPickTimeS(0);
+    setCurrentTaskIndex(0);
+    setCurrentPickingTask(null);
 
     ejecutarBucleSimulacion();
   };
@@ -218,48 +278,70 @@ export function MapaView() {
   const cancelarSimulacion = () => {
     setIsSimulating(false);
     setIsPaused(false);
-    setCurrentStepIndex(0);
-    setCurrentTaskIndex(0);
-    setSimTimeElapsedS(0);
-    setSimTravelTimeS(0);
-    setSimPickTimeS(0);
-    setCurrentWaypointNode(salidaInicio);
+    setRoverStatus('INACTIVO');
+    setCurrentWaypointNode(rutaCalculada?.salida_inicio || salidaInicio);
     setRoverCoords(null);
     setActiveBeepSignal(null);
+    setCurrentPickingTask(null);
+    setPickingTimeRemaining(0);
     if (simTimerRef.current) clearInterval(simTimerRef.current);
   };
 
   const ejecutarBucleSimulacion = () => {
     if (simTimerRef.current) clearInterval(simTimerRef.current);
 
-    const intervalMs = 120;
+    const intervalMs = 100;
     const stepDurationSec = (intervalMs / 1000) * simSpeedMultiplier;
 
     simTimerRef.current = setInterval(() => {
+      const state = simStateRef.current;
+      if (!state.events || state.eventIdx >= state.events.length) {
+        clearInterval(simTimerRef.current);
+        setIsSimulating(false);
+        setRoverStatus('INACTIVO');
+        setCurrentPickingTask(null);
+        return;
+      }
+
       setSimTimeElapsedS((prev) => prev + stepDurationSec);
 
-      setCurrentStepIndex((prevStep) => {
-        if (!activeWaypoints || prevStep >= activeWaypoints.length - 1) {
-          clearInterval(simTimerRef.current);
-          setIsSimulating(false);
-          return prevStep;
+      const currentEvent = state.events[state.eventIdx];
+
+      if (currentEvent.type === 'MOVE') {
+        setRoverStatus('DESPLAZANDOSE');
+        setCurrentWaypointNode(currentEvent.node);
+        setCurrentPickingTask(null);
+        setSimTravelTimeS((prev) => prev + stepDurationSec);
+
+        // Avanzar al siguiente evento en el próximo ciclo
+        state.eventIdx++;
+        state.isPicking = false;
+        state.pickTimerS = 0;
+
+      } else if (currentEvent.type === 'PICK_STOP') {
+        // PARADA FÍSICA OBLIGATORIA DE RECOGIDA
+        if (!state.isPicking) {
+          // Inicio de la parada de picking
+          state.isPicking = true;
+          state.pickTimerS = currentEvent.duration_s;
+          setRoverStatus('RECOGIENDO');
+          setCurrentWaypointNode(currentEvent.node);
+          setCurrentPickingTask(currentEvent.task);
+          triggerAudioBeep(currentEvent.nivel);
         }
 
-        const nextStep = prevStep + 1;
-        const currentNode = activeWaypoints[nextStep];
-        setCurrentWaypointNode(currentNode);
+        // Cuenta regresiva del tiempo de recogida exacto según el nivel (Nivel 2 = 3x Nivel 1)
+        state.pickTimerS -= stepDurationSec;
+        setSimPickTimeS((prev) => prev + stepDurationSec);
+        setPickingTimeRemaining(Math.max(0, Math.ceil(state.pickTimerS)));
 
-        const currentTask = activeListaDespacho[currentTaskIndex];
-        if (currentTask && currentTask.access_node === currentNode) {
-          triggerAudioBeep(currentTask.nivel);
-          setCurrentTaskIndex((tIdx) => Math.min(tIdx + 1, activeListaDespacho.length - 1));
-          setSimPickTimeS((prev) => prev + (currentTask.tiempo_recogida_s || 15));
-        } else {
-          setSimTravelTimeS((prev) => prev + stepDurationSec);
+        if (state.pickTimerS <= 0) {
+          // Finalizó la recogida en esta ubicación -> Avanzar al siguiente evento
+          state.isPicking = false;
+          state.eventIdx++;
+          setCurrentTaskIndex((prev) => prev + 1);
         }
-
-        return nextStep;
-      });
+      }
     }, intervalMs);
   };
 
@@ -327,6 +409,46 @@ export function MapaView() {
             </div>
           </div>
 
+          {/* Banner de Estado de la Simulación Virtual en Vivo */}
+          {isSimulating && (
+            <div style={{
+              backgroundColor: roverStatus === 'RECOGIENDO' ? '#451a03' : '#0c4a6e',
+              border: `1px solid ${roverStatus === 'RECOGIENDO' ? '#f59e0b' : '#38bdf8'}`,
+              color: '#ffffff',
+              padding: '10px 14px',
+              borderRadius: '6px',
+              marginBottom: '12px',
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {roverStatus === 'RECOGIENDO' ? (
+                  <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b', color: '#fff', fontWeight: 'bold' }}>
+                    DETENIDO EN ESTANTERÍA
+                  </span>
+                ) : (
+                  <span className="badge badge-primary" style={{ backgroundColor: '#0284c7', color: '#fff', fontWeight: 'bold' }}>
+                    MOVIÉNDOSE EN PASILLO
+                  </span>
+                )}
+                <span>
+                  {roverStatus === 'RECOGIENDO' && currentPickingTask
+                    ? `Recogiendo en ${currentPickingTask.etiqueta_completa || currentPickingTask.codigo_ubicacion} (${currentPickingTask.nivel === 'NIVEL_1' ? '1er Nivel - 15s' : currentPickingTask.nivel === 'NIVEL_2' ? '2do Nivel - 45s (3x)' : 'Ambos Niveles - 60s'})`
+                    : `Rover en nodo de tránsito ${currentWaypointNode}`}
+                </span>
+              </div>
+
+              {roverStatus === 'RECOGIENDO' && (
+                <div style={{ backgroundColor: '#78350f', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold', color: '#fef08a' }}>
+                  Tiempo restante: {pickingTimeRemaining}s
+                </div>
+              )}
+            </div>
+          )}
+
           <MapaAlmacenSVG
             ubicaciones={ubicaciones}
             selectedLocIds={selectedLocIds}
@@ -334,9 +456,11 @@ export function MapaView() {
             activeRouteWaypoints={activeWaypoints}
             roverPositionNode={currentWaypointNode}
             roverCoords={roverCoords}
+            roverStatus={roverStatus}
+            roverCurrentTask={currentPickingTask}
             isSimulating={isSimulating}
-            startExit={salidaInicio}
-            endExit={salidaFin}
+            startExit={rutaCalculada?.salida_inicio || salidaInicio}
+            endExit={rutaCalculada?.salida_fin || salidaFin}
           />
         </div>
 
@@ -355,6 +479,7 @@ export function MapaView() {
                   Salida de Inicio:
                 </label>
                 <select className="form-control" value={salidaInicio} onChange={(e) => setSalidaInicio(e.target.value)}>
+                  <option value="AUTO">Automático (Mejor Salida)</option>
                   <option value="SALIDA_1">SALIDA 1 (Izquierda)</option>
                   <option value="SALIDA_2">SALIDA 2 (Derecha)</option>
                 </select>
@@ -365,6 +490,7 @@ export function MapaView() {
                   Salida de Retorno:
                 </label>
                 <select className="form-control" value={salidaFin} onChange={(e) => setSalidaFin(e.target.value)}>
+                  <option value="AUTO">Automático (Mejor Salida)</option>
                   <option value="SALIDA_1">SALIDA 1 (Izquierda)</option>
                   <option value="SALIDA_2">SALIDA 2 (Derecha)</option>
                 </select>
@@ -630,6 +756,13 @@ export function MapaView() {
                       >
                         Ambos
                       </button>
+                      <button
+                        title="Sin Nivel Asignado (Blanco)"
+                        style={{ border: '1px solid #94a3b8', background: '#ffffff', color: '#0f172a', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 'bold' }}
+                        onClick={() => handleQuickAssignLevel(u.id, 'SIN_NIVEL')}
+                      >
+                        Sin Nivel
+                      </button>
                     </div>
                   </td>
                   <td>
@@ -674,6 +807,7 @@ export function MapaView() {
                   value={editingLoc.nivel}
                   onChange={(e) => setEditingLoc({ ...editingLoc, nivel: e.target.value })}
                 >
+                  <option value="SIN_NIVEL">Sin Nivel (Blanco)</option>
                   <option value="NIVEL_1">Nivel 1 (Primer nivel - Amarillo)</option>
                   <option value="NIVEL_2">Nivel 2 (Segundo nivel - Rojo, 3x tiempo)</option>
                   <option value="AMBOS">Ambos Niveles (Nivel 1 y 2 - Naranja)</option>
