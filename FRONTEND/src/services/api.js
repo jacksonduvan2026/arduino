@@ -24,9 +24,24 @@ export const api = {
   getProductosIncluir: (params) => fetchAPI(`/api/productos-incluir?${new URLSearchParams(params || {})}`),
   getVentas: (params) => fetchAPI(`/api/ventas?${new URLSearchParams(params)}`),
   getVentaDetalle: (id) => fetchAPI(`/api/ventas/${id}`),
-  getCronograma: (params) => fetchAPI(`/api/cronograma?${new URLSearchParams(params)}`),
+  getCronograma: (params) => {
+    const cleanParams = {};
+    if (params) {
+      Object.keys(params).forEach(k => {
+        if (params[k] !== undefined && params[k] !== null && params[k] !== '') {
+          cleanParams[k] = params[k];
+        }
+      });
+    }
+    return fetchAPI(`/api/cronograma?${new URLSearchParams(cleanParams)}`);
+  },
+  getCronogramaPreview: (data) => fetchAPI('/api/cronograma/preview', { method: 'POST', body: JSON.stringify(data) }),
+  iniciarCicloCronograma: (data) => fetchAPI('/api/cronograma/iniciar', { method: 'POST', body: JSON.stringify(data) }),
   regenerarCronograma: () => fetchAPI('/api/cronograma/regenerar', { method: 'POST' }),
   registrarConteo: (data) => fetchAPI('/api/cronograma/conteo', { method: 'POST', body: JSON.stringify(data) }),
+  reprogramarAsignacion: (data) => fetchAPI('/api/cronograma/reprogramar', { method: 'POST', body: JSON.stringify(data) }),
+  anularAsignacion: (data) => fetchAPI('/api/cronograma/anular', { method: 'POST', body: JSON.stringify(data) }),
+  getReferenciaHistorial: (codigo) => fetchAPI(`/api/cronograma/referencia/${encodeURIComponent(codigo)}`),
   getReportesVentasPeriodo: () => fetchAPI('/api/reportes/ventas-periodo'),
   getReportesCronogramaResumen: () => fetchAPI('/api/reportes/cronograma-resumen'),
   getReportesTopReferencias: () => fetchAPI('/api/reportes/top-referencias'),

@@ -3,8 +3,6 @@
 > vite --host 127.0.0.1 --port 3000
 
 
-  VITE v5.4.21  ready in 250 ms
+  VITE v5.4.21  ready in 257 ms
 
   ➜  Local:   http://127.0.0.1:3000/
-2:00:57 AM [vite] hmr update /src/components/MapaAlmacenSVG.jsx
-2:01:14 AM [vite] hmr update /src/views/MapaView.jsx

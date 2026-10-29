@@ -12,6 +12,7 @@ class Producto(Base):
     stock_actual = Column(Float, default=0.0)
     unidad_medida = Column(String, default="Unidad")
     ubicacion = Column(String, default="Almacén Principal")
+    activo = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -56,8 +57,10 @@ class Cronograma(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     nombre = Column(String, default="Cronograma Cíclico Anual")
+    fecha_inicio = Column(DateTime, nullable=True)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
     activo = Column(Boolean, default=True)
+    estado = Column(String, default="ACTIVO") # ACTIVO, FINALIZADO, ARCHIVADO
 
     items = relationship("CronogramaItem", back_populates="cronograma", cascade="all, delete-orphan")
 
@@ -69,7 +72,9 @@ class CronogramaItem(Base):
     semana = Column(Integer, index=True)
     codigo_referencia = Column(String, index=True)
     numero_conteo = Column(Integer, default=1) # 1 a 5
-    estado = Column(String, default="PROGRAMADO") # PROGRAMADO, COMPLETADO
+    fecha_programada = Column(DateTime, nullable=True)
+    fecha_confirmacion = Column(DateTime, nullable=True)
+    estado = Column(String, default="PROGRAMADO") # PROGRAMADO, PENDIENTE, COMPLETADO, ANULADO
 
     cronograma = relationship("Cronograma", back_populates="items")
     historial = relationship("HistorialConteo", back_populates="item", cascade="all, delete-orphan")

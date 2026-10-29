@@ -5,6 +5,7 @@ import random
 from datetime import datetime
 from sqlalchemy.orm import Session
 from models import Producto, Venta, ProductoAIncluir, Cronograma, CronogramaItem
+from services.cronograma_service import generar_cronograma_algoritmo
 
 def importar_datos_excel(filepath: str, db: Session):
     if not os.path.exists(filepath):
@@ -173,76 +174,35 @@ def importar_datos_excel(filepath: str, db: Session):
         "total_productos_registrados": db.query(Producto).count()
     }
 
-def generar_cronograma_algoritmo(num_referencias=600, conteos_por_ref=5, semanas_totales=49, cupo_semanal_normal=62, cupo_semana_final=24, min_distancia=5):
-    referencias = [f"REF-{i+1:03d}" for i in range(num_referencias)]
-    saldo = {ref: conteos_por_ref for ref in referencias}
-    ultima_semana = {ref: -999 for ref in referencias}
-    conteo_num = {ref: 0 for ref in referencias}
+def generar_y_guardar_cronograma(db: Session, nombre="Cronograma Cíclico Anual", fecha_inicio: datetime = None):
+    # Desactivar/Archivar cronogramas anteriores
+    db.query(Cronograma).update({"activo": False, "estado": "ARCHIVADO"})
 
-    cronograma = {}
+    f_inicio = fecha_inicio or datetime.utcnow()
 
-    for semana in range(1, semanas_totales + 1):
-        semanas_restantes = semanas_totales - semana + 1
-        meta_semana = cupo_semanal_normal if semana < semanas_totales else cupo_semana_final
+    # Obtener referencias elegibles reales de la base de datos (productos con activo=True o todos los registrados)
+    prods_elegibles = db.query(Producto.codigo).filter(Producto.activo == True).order_by(Producto.codigo.asc()).all()
+    referencias = [p[0] for p in prods_elegibles]
 
-        seleccionados_semana = set()
+    # Si no hay productos, o para garantizar compatibilidad con 600 refs
+    if not referencias:
+        referencias = [f"REF-{i+1:03d}" for i in range(600)]
 
-        # 1. Cota de Urgencia
-        for ref in referencias:
-            if saldo[ref] == semanas_restantes:
-                seleccionados_semana.add(ref)
+    cronograma_dict, cuotas, resumen = generar_cronograma_algoritmo(
+        referencias=referencias,
+        fecha_inicio=f_inicio,
+        counts_per_ref=5
+    )
 
-        # 2. Completar cupos
-        distancia_actual = min_distancia
-        while len(seleccionados_semana) < meta_semana:
-            candidatos = [
-                ref for ref in referencias
-                if ref not in seleccionados_semana
-                and saldo[ref] > 0
-                and (semana - ultima_semana[ref]) >= distancia_actual
-            ]
-
-            cupos_faltantes = meta_semana - len(seleccionados_semana)
-
-            if len(candidatos) >= cupos_faltantes:
-                elegidos = random.sample(candidatos, cupos_faltantes)
-                seleccionados_semana.update(elegidos)
-            else:
-                if distancia_actual > 1:
-                    distancia_actual -= 1
-                else:
-                    candidatos_emergencia = [
-                        ref for ref in referencias
-                        if ref not in seleccionados_semana and saldo[ref] > 0
-                    ]
-                    elegidos = random.sample(candidatos_emergencia, cupos_faltantes)
-                    seleccionados_semana.update(elegidos)
-
-        # 3. Actualizar estado e historial
-        items_semana = []
-        for ref in seleccionados_semana:
-            saldo[ref] -= 1
-            ultima_semana[ref] = semana
-            conteo_num[ref] += 1
-            items_semana.append({
-                "codigo_referencia": ref,
-                "numero_conteo": conteo_num[ref]
-            })
-
-        cronograma[semana] = items_semana
-
-    return cronograma
-
-def generar_y_guardar_cronograma(db: Session, nombre="Cronograma Cíclico Anual"):
-    # Desactivar cronogramas anteriores
-    db.query(Cronograma).update({"activo": False})
-
-    nuevo_crono = Cronograma(nombre=nombre, activo=True)
+    nuevo_crono = Cronograma(
+        nombre=nombre,
+        fecha_inicio=f_inicio,
+        activo=True,
+        estado="ACTIVO"
+    )
     db.add(nuevo_crono)
     db.commit()
     db.refresh(nuevo_crono)
-
-    cronograma_dict = generar_cronograma_algoritmo()
 
     items_objs = []
     for semana, lista_items in cronograma_dict.items():
@@ -252,6 +212,7 @@ def generar_y_guardar_cronograma(db: Session, nombre="Cronograma Cíclico Anual"
                 semana=semana,
                 codigo_referencia=item["codigo_referencia"],
                 numero_conteo=item["numero_conteo"],
+                fecha_programada=item["fecha_programada"],
                 estado="PROGRAMADO"
             )
             items_objs.append(crono_item)
