@@ -18,21 +18,21 @@ export function MapaAlmacenSVG({
 
   // Distribución de 5 pasillos transitables (A0..A4) y 4 bloques de estanterías (1 simple, 3 dobles)
   const colXMap = {
-    1: 90,   // Bloque 1 (Simple)
-    2: 210,  // Bloque 2 (Cara Izquierda)
-    3: 270,  // Bloque 2 (Cara Derecha)
-    4: 390,  // Bloque 3 (Cara Izquierda)
-    5: 450,  // Bloque 3 (Cara Derecha)
-    6: 570,  // Bloque 4 (Cara Izquierda)
-    7: 630   // Bloque 4 (Cara Derecha)
+    1: 120,  // Bloque 1 (Simple)
+    2: 265,  // Bloque 2 (Cara Izquierda)
+    3: 315,  // Bloque 2 (Cara Derecha)
+    4: 465,  // Bloque 3 (Cara Izquierda)
+    5: 515,  // Bloque 3 (Cara Derecha)
+    6: 665,  // Bloque 4 (Cara Izquierda)
+    7: 715   // Bloque 4 (Cara Derecha)
   };
 
   const aisleXMap = {
-    A0: 40,   // Pasillo 1 (Exterior izquierdo)
-    A1: 150,  // Pasillo 2 (Entre Bloque 1 y Bloque 2)
-    A2: 330,  // Pasillo 3 (Entre Bloque 2 y Bloque 3)
-    A3: 510,  // Pasillo 4 (Entre Bloque 3 y Bloque 4)
-    A4: 690   // Pasillo 5 (Exterior derecho)
+    A0: 50,   // Pasillo 1 (Exterior izquierdo - Alineado con Salida 1)
+    A1: 190,  // Pasillo 2 (Entre Bloque 1 y Bloque 2)
+    A2: 390,  // Pasillo 3 (Entre Bloque 2 y Bloque 3)
+    A3: 590,  // Pasillo 4 (Entre Bloque 3 y Bloque 4)
+    A4: 790   // Pasillo 5 (Exterior derecho - Alineado con Salida 2)
   };
 
   const rowYMap = {
@@ -52,8 +52,8 @@ export function MapaAlmacenSVG({
   const exitY = 570;
 
   const exitXMap = {
-    SALIDA_1: 150,
-    SALIDA_2: 510
+    SALIDA_1: 50,  // Alineada con Pasillo 1 (A0)
+    SALIDA_2: 790  // Alineada con Pasillo 5 (A4)
   };
 
   const getWayPointSvgCoords = (nodeId) => {
@@ -146,19 +146,19 @@ export function MapaAlmacenSVG({
             <line key={aisleKey} x1={xVal} y1={topAisleY} x2={xVal} y2={bottomAisleY} />
           ))}
 
-          <line x1={exitXMap.SALIDA_1} y1={exitY} x2={aisleXMap.A1} y2={bottomAisleY} stroke="#10b981" strokeWidth="2" />
-          <line x1={exitXMap.SALIDA_2} y1={exitY} x2={aisleXMap.A3} y2={bottomAisleY} stroke="#ff1744" strokeWidth="2" />
+          <line x1={exitXMap.SALIDA_1} y1={exitY} x2={aisleXMap.A0} y2={bottomAisleY} stroke="#10b981" strokeWidth="2" />
+          <line x1={exitXMap.SALIDA_2} y1={exitY} x2={aisleXMap.A4} y2={bottomAisleY} stroke="#ff1744" strokeWidth="2" />
         </g>
 
         {/* 4 Bloques de Estanterías (Estructura física) */}
         {/* Bloque 1: Estantería Simple Izquierda (Col 1) */}
-        <rect x="68" y="45" width="44" height="430" fill="#08090b" rx="4" stroke="#383e49" strokeWidth="1.5" opacity="0.9" />
+        <rect x="98" y="45" width="44" height="430" fill="#08090b" rx="4" stroke="#383e49" strokeWidth="1.5" opacity="0.9" />
         {/* Bloque 2: Estantería Doble (Col 2 & Col 3) */}
-        <rect x="188" y="45" width="104" height="430" fill="#08090b" rx="4" stroke="#383e49" strokeWidth="1.5" opacity="0.9" />
+        <rect x="238" y="45" width="104" height="430" fill="#08090b" rx="4" stroke="#383e49" strokeWidth="1.5" opacity="0.9" />
         {/* Bloque 3: Estantería Doble (Col 4 & Col 5) */}
-        <rect x="368" y="45" width="104" height="430" fill="#08090b" rx="4" stroke="#383e49" strokeWidth="1.5" opacity="0.9" />
+        <rect x="438" y="45" width="104" height="430" fill="#08090b" rx="4" stroke="#383e49" strokeWidth="1.5" opacity="0.9" />
         {/* Bloque 4: Estantería Doble Derecha (Col 6 & Col 7) */}
-        <rect x="548" y="45" width="104" height="430" fill="#08090b" rx="4" stroke="#383e49" strokeWidth="1.5" opacity="0.9" />
+        <rect x="638" y="45" width="104" height="430" fill="#08090b" rx="4" stroke="#383e49" strokeWidth="1.5" opacity="0.9" />
 
         {/* Etiquetas de Pasillos Transitables */}
         <text x={aisleXMap.A0} y="34" textAnchor="middle" fill="#ff4569" fontSize="9" fontWeight="bold">PASILLO 1</text>
@@ -260,43 +260,43 @@ export function MapaAlmacenSVG({
         </text>
 
         {/* Puertas de Salida en la pared inferior (ambas etiquetadas SALIDA) */}
-        {/* Puerta SALIDA 1 */}
-        <g transform={`translate(${exitXMap.SALIDA_1 - 45}, ${exitY - 18})`}>
+        {/* Puerta SALIDA 1 (Alineada con Pasillo 1) */}
+        <g transform={`translate(${exitXMap.SALIDA_1 - 35}, ${exitY - 18})`}>
           <rect
             x="0"
             y="0"
-            width="90"
+            width="70"
             height="36"
             rx="6"
             fill={startExit === 'SALIDA_1' ? '#059669' : '#064e3b'}
             stroke="#10b981"
             strokeWidth="2"
           />
-          <text x="45" y="22" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">
-            SALIDA
+          <text x="35" y="22" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">
+            SALIDA 1
           </text>
         </g>
 
         {/* Acotación entre salidas */}
-        <g transform={`translate(${exitXMap.SALIDA_1 + 45}, ${exitY - 5})`}>
-          <line x1="0" y1="0" x2="270" y2="0" stroke="#a5a9b2" strokeWidth="1" strokeDasharray="3,3" />
-          <text x="135" y="-4" textAnchor="middle" fill="#a5a9b2" fontSize="10" fontWeight="bold">2.4 m entre salidas</text>
+        <g transform={`translate(${exitXMap.SALIDA_1 + 35}, ${exitY - 5})`}>
+          <line x1="0" y1="0" x2={exitXMap.SALIDA_2 - exitXMap.SALIDA_1 - 70} y2="0" stroke="#a5a9b2" strokeWidth="1" strokeDasharray="3,3" />
+          <text x={(exitXMap.SALIDA_2 - exitXMap.SALIDA_1 - 70) / 2} y="-4" textAnchor="middle" fill="#a5a9b2" fontSize="10" fontWeight="bold">10.0 m entre salidas</text>
         </g>
 
-        {/* Puerta SALIDA 2 */}
-        <g transform={`translate(${exitXMap.SALIDA_2 - 45}, ${exitY - 18})`}>
+        {/* Puerta SALIDA 2 (Alineada con Pasillo 5) */}
+        <g transform={`translate(${exitXMap.SALIDA_2 - 35}, ${exitY - 18})`}>
           <rect
             x="0"
             y="0"
-            width="90"
+            width="70"
             height="36"
             rx="6"
             fill={startExit === 'SALIDA_2' ? '#a80f2d' : '#450a15'}
             stroke="#ff1744"
             strokeWidth="2"
           />
-          <text x="45" y="22" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">
-            SALIDA
+          <text x="35" y="22" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">
+            SALIDA 2
           </text>
         </g>
 
