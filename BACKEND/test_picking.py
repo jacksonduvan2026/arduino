@@ -209,3 +209,33 @@ def test_12_ubicaciones_sin_nivel_blancas():
     res = client.get("/api/mapa/ubicaciones").json()
     u_data = next(x for x in res["ubicaciones"] if x["id"] == "LOC_R5_C5")
     assert u_data["nivel"] == "SIN_NIVEL"
+
+def test_13_regla_tiempos_recogida_t_y_validacion_referencia():
+    # Probar las reglas obligatorias de picking (Rojo N1=1t, Amarillo N2=3t, Naranja=4t)
+    from routers.mapa_picking import calcular_costo_recogida_t
+    c1 = calcular_costo_recogida_t(None, "NIVEL_1")
+    assert c1["tiempo_t"] == 1.0
+    c2 = calcular_costo_recogida_t(None, "NIVEL_2")
+    assert c2["tiempo_t"] == 3.0
+    c3 = calcular_costo_recogida_t(None, "AMBOS")
+    assert c3["tiempo_t"] == 4.0
+
+    # Probar endpoint calcular-ruta con 9 ubicaciones únicas
+    res = client.post("/api/mapa/calcular-ruta", json={
+        "ubicaciones_ids": ["LOC_R8_C7", "LOC_R3_C7", "LOC_R6_C6", "LOC_R5_C5", "LOC_R2_C6", "LOC_R4_C3", "LOC_R2_C4", "LOC_R6_C2", "LOC_R8_C1"],
+        "salida_inicio": "SALIDA_1",
+        "salida_fin": "SALIDA_1",
+        "velocidad_rover_ms": 1.0,
+        "tiempo_pick_nivel_1_s": 1.0,
+        "tiempo_pick_nivel_2_s": 3.0
+    }).json()
+
+    assert "validacion_referencia" in res
+    ref_info = res["validacion_referencia"]["referencia_documentada"]
+    assert ref_info["distancia_m"] == 185.1
+    assert ref_info["tiempo_recogida_t"] == 20.0
+    assert ref_info["numero_viajes"] == 4
+
+    dif = res["validacion_referencia"]["diferencias"]
+    assert dif["diferencia_distancia_abs_m"] > 0
+    assert "explicacion_discrepancia" in dif
