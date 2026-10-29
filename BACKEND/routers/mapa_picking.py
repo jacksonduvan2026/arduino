@@ -292,32 +292,44 @@ def dijkstra_shortest_path(start_node: str, target_node: str):
 
 def calcular_costo_recogida_t(categoria: Optional[str], nivel: Optional[str]) -> Dict[str, Any]:
     """
-    Regla obligatoria de tiempos de recogida (unidades t):
-    - Rojo, nivel N1: 1t por recogida.
-    - Amarillo, nivel N2: 3t por recogida.
-    - Naranja, niveles N1 y N2: 4t por recogida (cubre N1 y N2).
-
-    Si nivel es 'NIVEL_1', 'NIVEL_2' o 'AMBOS', o si se deduce por categoría:
-    - Rojo (o NIVEL_1 solo): 1t
-    - Amarillo (o NIVEL_2 solo): 3t
-    - Naranja (o AMBOS): 4t
+    Regla obligatoria de tiempos y niveles por categoría:
+    - Amarillo: Nivel N1 obligatorio -> 3t por operación.
+    - Rojo: Nivel N2 obligatorio -> 1t por operación.
+    - Naranja: Niveles N1 y N2 obligatorios (agrupados en 1 sola operación/viaje) -> 4t por operación total.
     """
     cat_norm = (categoria or "").strip().upper()
     niv_norm = (nivel or "").strip().upper()
 
-    # Si se especifica por nivel o categoría explícita
-    if niv_norm == "NIVEL_1" or cat_norm == "ROJO":
-        return {"tiempo_t": 1.0, "categoria": "ROJO", "nivel": "NIVEL_1", "advertencia": None}
-    elif niv_norm == "NIVEL_2" or cat_norm == "AMARILLO":
-        return {"tiempo_t": 3.0, "categoria": "AMARILLO", "nivel": "NIVEL_2", "advertencia": None}
-    elif niv_norm == "AMBOS" or cat_norm == "NARANJA":
-        return {"tiempo_t": 4.0, "categoria": "NARANJA", "nivel": "AMBOS", "advertencia": None}
+    if cat_norm == "NARANJA" or niv_norm == "AMBOS":
+        return {
+            "tiempo_t": 4.0,
+            "categoria": "NARANJA",
+            "nivel": "AMBOS",
+            "niveles_requeridos": ["NIVEL_1", "NIVEL_2"],
+            "advertencia": None if cat_norm in ["NARANJA", "AMARILLO", "ROJO"] else "Categoría deduciéndose por Niveles N1+N2 (4t)."
+        }
+    elif cat_norm == "AMARILLO" or niv_norm == "NIVEL_1":
+        return {
+            "tiempo_t": 3.0,
+            "categoria": "AMARILLO",
+            "nivel": "NIVEL_1",
+            "niveles_requeridos": ["NIVEL_1"],
+            "advertencia": None if cat_norm in ["NARANJA", "AMARILLO", "ROJO"] else "Categoría deduciéndose por Nivel 1 (3t)."
+        }
+    elif cat_norm == "ROJO" or niv_norm == "NIVEL_2":
+        return {
+            "tiempo_t": 1.0,
+            "categoria": "ROJO",
+            "nivel": "NIVEL_2",
+            "niveles_requeridos": ["NIVEL_2"],
+            "advertencia": None if cat_norm in ["NARANJA", "AMARILLO", "ROJO"] else "Categoría deduciéndose por Nivel 2 (1t)."
+        }
     else:
-        # Si la categoría/nivel no puede determinarse
         return {
             "tiempo_t": 1.0,
             "categoria": "DESCONOCIDO",
             "nivel": niv_norm or "SIN_NIVEL",
+            "niveles_requeridos": [niv_norm] if niv_norm else [],
             "advertencia": "Categoría o nivel no registrado. Asignado tiempo base de 1t por defecto."
         }
 
@@ -828,8 +840,7 @@ def calcular_ruta(req: RutaRequest, db: Session = Depends(get_db)):
         "velocidad_rover_ms": vel_ms,
         "restricciones": {
             "max_ubicaciones_por_viaje": 3,
-            "factor_nivel_2": "3x respecto al primer nivel",
-            "regla_tiempos_recogida": "Rojo N1=1t, Amarillo N2=3t, Naranja N1+N2=4t"
+            "regla_tiempos_recogida": "Amarillo N1=3t, Rojo N2=1t, Naranja N1+N2=4t (Operación unificada)"
         },
         "ruta_inicial": res_inicial,
         "ruta_optimizada": res_optimizada,
@@ -858,7 +869,8 @@ def calcular_ruta(req: RutaRequest, db: Session = Depends(get_db)):
                 "diferencia_viajes": dif_viajes,
                 "explicacion_discrepancia": (
                     "1) La referencia agrupa 12 líneas en 4 viajes independientes con retornos completos a la salida en cada iteración (43.6 + 54.6 + 57.7 + 29.2 = 185.1m). "
-                    "2) El sistema actual consolida las 9 ubicaciones físicas únicas solicitadas en 3 viajes (9/3=3), eliminando retornos innecesarios y seleccionando la mejor salida (SALIDA_2), logrando un recorrido más corto (93.2m)."
+                    "2) El sistema consolida las operaciones Naranja (N1+N2) en una sola parada y viaje lógico por ubicación (9 ubicaciones únicas en 3 viajes de 3 paradas), "
+                    "evitando viajes innecesarios y optimizando el trayecto a 93.2m."
                 )
             }
         },
