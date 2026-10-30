@@ -3,25 +3,21 @@ import math
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Tuple, Optional
 
-def calcular_cuotas_semanales(num_referencias: int, counts_per_ref: int = 5) -> Tuple[int, List[int]]:
+def calcular_cuotas_semanales(num_referencias: int, counts_per_ref: int = 1, total_semanas: int = 52) -> Tuple[int, List[int]]:
     """
-    Calcula las semanas totales y el cupo para cada semana.
-    Para 600 referencias: 48 semanas de 62 items y 1 semana de 24 items (Total 49 semanas, 3000 asignaciones).
-    Para N referencias: distribuye equilibradamente asegurando que total_semanas >= counts_per_ref.
+    Calcula las semanas totales y la cuota de asignaciones para cada semana según el número real N de referencias.
+    Distribuye las asignaciones de forma equilibrada a lo largo del periodo.
     """
     total_asignaciones = num_referencias * counts_per_ref
+    if total_asignaciones <= 0:
+        return 1, [0]
 
-    if num_referencias == 600:
-        total_semanas = 49
-        cuotas = [62] * 48 + [24]
-    else:
-        # Garantizar que al menos existan `counts_per_ref` semanas para evitar violar max 1 aparicion/semana/ref
-        total_semanas = max(counts_per_ref, math.ceil(total_asignaciones / 62)) if total_asignaciones > 0 else 1
-        base_quota = total_asignaciones // total_semanas
-        rem = total_asignaciones % total_semanas
-        cuotas = [base_quota + 1] * rem + [base_quota] * (total_semanas - rem)
+    semanas = max(counts_per_ref, total_semanas)
+    base_quota = total_asignaciones // semanas
+    rem = total_asignaciones % semanas
+    cuotas = [base_quota + 1] * rem + [base_quota] * (semanas - rem)
 
-    return total_semanas, cuotas
+    return semanas, cuotas
 
 def validar_cronograma_generado(
     cronograma: Dict[int, List[Dict[str, Any]]],
@@ -64,7 +60,7 @@ def validar_cronograma_generado(
 def generar_cronograma_algoritmo(
     referencias: List[str],
     fecha_inicio: Optional[datetime] = None,
-    counts_per_ref: int = 5,
+    counts_per_ref: int = 1,
     seed: Optional[int] = None
 ) -> Tuple[Dict[int, List[Dict[str, Any]]], List[int], Dict[str, Any]]:
     """

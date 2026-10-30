@@ -243,24 +243,24 @@ def generar_vista_previa(req: PreviewRequest, db: Session = Depends(get_db)):
     referencias = [p[0] for p in prods_elegibles]
 
     if not referencias:
-        referencias = [f"REF-{i+1:03d}" for i in range(600)]
+        raise HTTPException(status_code=400, detail="No se encontraron referencias elegibles en el catálogo.")
 
     try:
         cronograma_dict, cuotas, resumen = generar_cronograma_algoritmo(
             referencias=referencias,
             fecha_inicio=f_inicio,
-            counts_per_ref=5
+            counts_per_ref=1
         )
         es_valido = True
-        msg_val = "Vista previa del cronograma generada y validada correctamente con todas las restricciones."
+        msg_val = "Vista previa del cronograma generada y validada correctamente con las referencias reales elegibles."
     except Exception as e:
         es_valido = False
         msg_val = str(e)
         cuotas = []
         resumen = {
             "num_referencias": len(referencias),
-            "total_asignaciones": len(referencias) * 5,
-            "total_semanas": 49
+            "total_asignaciones": len(referencias),
+            "total_semanas": 52
         }
 
     return {
@@ -269,9 +269,9 @@ def generar_vista_previa(req: PreviewRequest, db: Session = Depends(get_db)):
         "ciclo_activo_nombre": crono_activo.nombre if crono_activo else None,
         "fecha_inicio_seleccionada": req.fecha_inicio,
         "referencias_elegibles": len(referencias),
-        "total_conteos_objetivo": len(referencias) * 5,
-        "total_semanas_estimadas": resumen.get("total_semanas", 49),
-        "fecha_fin_estimada": (f_inicio + timedelta(days=7 * resumen.get("total_semanas", 49))).strftime("%Y-%m-%d"),
+        "total_conteos_objetivo": len(referencias),
+        "total_semanas_estimadas": resumen.get("total_semanas", 52),
+        "fecha_fin_estimada": (f_inicio + timedelta(days=7 * resumen.get("total_semanas", 52))).strftime("%Y-%m-%d"),
         "cuotas_semanales": cuotas,
         "es_valido": es_valido,
         "mensaje_validacion": msg_val
@@ -428,9 +428,7 @@ def anular_asignacion(req: AnularRequest, db: Session = Depends(get_db)):
 
 @router.get("/referencia/{codigo}")
 def get_referencia_historial(codigo: str, db: Session = Depends(get_db)):
-    code_str = codigo.strip().upper()
-    if not code_str.startswith("REF-") and code_str.isdigit():
-        code_str = f"REF-{int(code_str):03d}"
+    code_str = codigo.strip()
 
     prod = db.query(Producto).filter(Producto.codigo == code_str).first()
     if not prod:

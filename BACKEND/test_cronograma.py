@@ -57,16 +57,17 @@ def db_session():
 
     session = TestingSessionLocal()
 
-    # Populate test products (600 references)
+    # Populate test products (112 real references like in Excel)
+    codes = [f"{100000 + i}" for i in range(112)]
     prods = [
         Producto(
-            codigo=f"REF-{i+1:03d}",
-            descripcion=f"Producto Test {i+1:03d}",
+            codigo=c,
+            descripcion=f"Producto Festo {c}",
             categoria="General",
-            stock_actual=100.0,
+            stock_actual=10.0,
             activo=True
         )
-        for i in range(600)
+        for c in codes
     ]
     session.bulk_save_objects(prods)
     session.commit()
@@ -76,25 +77,17 @@ def db_session():
     finally:
         session.close()
 
-def test_algoritmo_600_referencias_3000_asignaciones():
-    refs = [f"REF-{i+1:03d}" for i in range(600)]
+def test_algoritmo_referencias_reales_elegibles():
+    refs = [f"{100000 + i}" for i in range(112)]
     f_start = datetime(2026, 2, 1)
 
-    crono_dict, cuotas, resumen = generar_cronograma_algoritmo(refs, f_start, counts_per_ref=5)
+    crono_dict, cuotas, resumen = generar_cronograma_algoritmo(refs, f_start, counts_per_ref=1)
 
-    assert resumen["num_referencias"] == 600
-    assert resumen["total_asignaciones"] == 3000
-    assert resumen["total_semanas"] == 49
+    assert resumen["num_referencias"] == 112
+    assert resumen["total_asignaciones"] == 112
+    assert resumen["total_semanas"] == 52
 
-    # First 48 weeks must have 62 assignments, week 49 must have 24
-    assert cuotas[:48] == [62] * 48
-    assert cuotas[48] == 24
-
-    # Each week must match its quota
-    for week in range(1, 50):
-        assert len(crono_dict[week]) == (62 if week < 49 else 24)
-
-    # Check each reference appears exactly 5 times and never twice in the same week
+    # Cada referencia debe aparecer exactamente 1 vez y sin duplicados en una misma semana
     counts = {r: 0 for r in refs}
     for week, items in crono_dict.items():
         week_refs = [it["codigo_referencia"] for it in items]
@@ -103,11 +96,11 @@ def test_algoritmo_600_referencias_3000_asignaciones():
             counts[r] += 1
 
     for r, cnt in counts.items():
-        assert cnt == 5, f"La referencia {r} tiene {cnt} asignaciones en lugar de 5"
+        assert cnt == 1, f"La referencia {r} tiene {cnt} asignaciones"
 
 def test_referencia_no_elegible_no_se_incorpora():
-    refs_elegibles = [f"REF-{i+1:03d}" for i in range(10)]
-    ref_invalida = "REF-INACTIVA-999"
+    refs_elegibles = [f"{100000 + i}" for i in range(10)]
+    ref_invalida = "999999"
 
     crono_dict, cuotas, resumen = generar_cronograma_algoritmo(refs_elegibles, datetime.now())
 
@@ -126,9 +119,9 @@ def test_fecha_programada_no_incrementa_conteo_confirmado(db_session):
 
     crono_res = get_cronograma_activo(db=db_session)
 
-    assert crono_res["kpis"]["conteos_programados"] == 3000
+    assert crono_res["kpis"]["conteos_programados"] == 112
     assert crono_res["kpis"]["conteos_confirmados"] == 0
-    assert crono_res["kpis"]["conteos_pendientes"] + crono_res["kpis"]["conteos_atrasados"] == 3000
+    assert crono_res["kpis"]["conteos_pendientes"] + crono_res["kpis"]["conteos_atrasados"] == 112
 
 def test_confirmacion_idempotente_y_incremento_progreso(db_session):
     f_today = datetime.utcnow().strftime("%Y-%m-%d")
@@ -145,7 +138,7 @@ def test_confirmacion_idempotente_y_incremento_progreso(db_session):
     # Verificar KPI incrementado exactamente 1 vez
     crono_after = get_cronograma_activo(db=db_session)
     assert crono_after["kpis"]["conteos_confirmados"] == 1
-    assert crono_after["kpis"]["conteos_pendientes"] + crono_after["kpis"]["conteos_atrasados"] == 2999
+    assert crono_after["kpis"]["conteos_pendientes"] + crono_after["kpis"]["conteos_atrasados"] == 111
 
     # 2. Re-confirmar duplicadamente debe ser rechazado con HTTP 400
     with pytest.raises(HTTPException) as exc_info:
@@ -157,33 +150,19 @@ def test_reprogramacion_sin_duplicado_semanal(db_session):
     f_today = datetime.utcnow().strftime("%Y-%m-%d")
     iniciar_nuevo_ciclo(IniciarCicloRequest(fecha_inicio=f_today), db=db_session)
     crono_res = get_cronograma_activo(db=db_session)
-    item = crono_res["items"][0]
+    crono_id = crono_res["cronograma_id"]
 
-    ref_code = item["codigo_referencia"]
+    # Crear dos ítems con el MISMO código de referencia en distintas semanas
+    it1 = CronogramaItem(cronograma_id=crono_id, semana=1, codigo_referencia="100001", numero_conteo=1)
+    it2 = CronogramaItem(cronograma_id=crono_id, semana=2, codigo_referencia="100001", numero_conteo=2)
+    db_session.add_all([it1, it2])
+    db_session.commit()
 
-    # Obtener semanas donde ref_code esta asignado actualmente
-    items_ref = db_session.query(CronogramaItem).filter(
-        CronogramaItem.cronograma_id == crono_res["cronograma_id"],
-        CronogramaItem.codigo_referencia == ref_code
-    ).all()
-    semanas_ocupadas = {it.semana for it in items_ref}
-    semanas_libres = [s for s in range(1, 50) if s not in semanas_ocupadas]
-
-    semana_destino = semanas_libres[0]
-
-    # Reprogramar a semana destino libre
-    req_reprog = ReprogramarRequest(cronograma_item_id=item["id"], nueva_semana=semana_destino, motivo="Cambio de turno")
-    res_reprog = reprogramar_asignacion(req_reprog, db=db_session)
-
-    assert res_reprog["nueva_semana"] == semana_destino
-
-    # Intentar reprogramar de nuevo a una semana que YA tiene esa referencia asignada debe fallar
-    otra_semana_ocupada = [s for s in semanas_ocupadas if s != item["semana"]][0]
-
+    # Intentar reprogramar it1 (semana 1) a la semana 2 donde ya existe '100001' (it2) debe fallar por duplicado
     with pytest.raises(HTTPException) as exc_info:
-        reprogramar_asignacion(ReprogramarRequest(cronograma_item_id=item["id"], nueva_semana=otra_semana_ocupada), db=db_session)
+        reprogramar_asignacion(ReprogramarRequest(cronograma_item_id=it1.id, nueva_semana=2), db=db_session)
     assert exc_info.value.status_code == 400
-    assert "ya está programada en la semana" in exc_info.value.detail
+    assert "ya está programada en la semana 2" in exc_info.value.detail
 
 def test_calculo_fechas_semanales_usuario(db_session):
     fecha_user = "2026-05-11" # Lunes
@@ -191,7 +170,21 @@ def test_calculo_fechas_semanales_usuario(db_session):
 
     assert res_preview["fecha_inicio_seleccionada"] == fecha_user
     assert res_preview["es_valido"] is True
-    assert res_preview["total_semanas_estimadas"] == 49
+    assert res_preview["total_semanas_estimadas"] == 52
 
     res_iniciar = iniciar_nuevo_ciclo(IniciarCicloRequest(fecha_inicio=fecha_user), db=db_session)
     assert res_iniciar["fecha_inicio"] == fecha_user
+
+def test_codigos_completos_e_integridad_excel(db_session):
+    # Verificar que los códigos no contengan prefijos 'REF-' sintéticos ni estén acortados
+    prods = db_session.query(Producto).all()
+    assert len(prods) == 112
+    for p in prods:
+        assert not p.codigo.startswith("REF-")
+        assert len(p.codigo) >= 6
+
+def test_modulos_mapas_inmutables():
+    # Garantizar que los módulos de mapa no hayan sido alterados
+    import subprocess
+    status = subprocess.check_output(["git", "status", "--porcelain", "BACKEND/routers/mapa_picking.py", "FRONTEND/src/components/MapaAlmacenSVG.jsx", "FRONTEND/src/views/MapaView.jsx"]).decode("utf-8")
+    assert status.strip() == "", "Se detectaron cambios indebidos en los módulos de mapa/picking"
