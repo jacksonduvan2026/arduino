@@ -24,19 +24,24 @@ export function ProductosView() {
 
   return (
     <div className="card">
-      <div className="card-header">
-        <h3 className="card-title">
-          <PackageCheck size={20} style={{ color: 'var(--primary)' }} />
-          Productos Propuestos para Incorporar al Inventario
-        </h3>
-        <a
-          href="/api/productos-incluir/export/csv"
-          className="btn btn-outline btn-sm"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <Download size={15} /> Exportar CSV
-        </a>
+      <div className="card-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+          <h3 className="card-title">
+            <PackageCheck size={20} style={{ color: 'var(--primary)' }} />
+            Productos Propuestos para Incorporar al Inventario (Estudio de Mercado)
+          </h3>
+          <a
+            href="/api/productos-incluir/export/csv"
+            className="btn btn-outline btn-sm"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Download size={15} /> Exportar CSV
+          </a>
+        </div>
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
+          * Las cantidades mensuales y la <strong>Demanda Anual Estimada</strong> corresponden al resultado del estudio de mercado oficial para la proyección de nuevos productos a ingresar.
+        </p>
       </div>
 
       <div className="table-responsive">
@@ -58,7 +63,7 @@ export function ProductosView() {
               <th>Oct</th>
               <th>Nov</th>
               <th>Dic</th>
-              <th>Total Anual</th>
+              <th>Demanda Anual Estimada</th>
             </tr>
           </thead>
           <tbody>

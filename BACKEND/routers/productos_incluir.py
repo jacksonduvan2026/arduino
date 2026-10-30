@@ -90,7 +90,7 @@ def export_productos_incluir_csv(db: Session = Depends(get_db)):
 
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
-    writer.writerow(["Codigo", "Descripcion", "Categoria", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre", "Total Anual"])
+    writer.writerow(["Codigo", "Descripcion", "Categoria", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre", "Demanda Anual Estimada"])
 
     meses_cols = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
 

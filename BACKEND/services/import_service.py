@@ -22,22 +22,21 @@ def importar_datos_excel(filepath: str, db: Session):
     productos_dict = {}
 
     for _, row in df_ventas.iterrows():
-        # Código de referencia
+        # Código de referencia completo sin truncar ni modificar
         raw_code = str(row["Codigo de la referencia"]).strip()
         if raw_code.endswith(".0"):
-            code = raw_code[:-2]
+            code_str = raw_code[:-2]
         else:
-            code = raw_code
-        code_str = f"REF-{int(code):03d}" if code.isdigit() else code
+            code_str = raw_code
 
         # Descripción
         desc = str(row["Descripción de la referencia"]).strip() if pd.notnull(row["Descripción de la referencia"]) else "Sin Descripción"
 
-        # Categoria (Si es #REF! o vacia, asignar Sin Categoría o derivar)
+        # Categoría (Si es #REF! o vacía, asignar General)
         cat_raw = str(row["Calegoria"]).strip() if pd.notnull(row["Calegoria"]) else ""
         categoria = "General" if cat_raw in ["#REF!", "nan", ""] else cat_raw
 
-        # Guardar o actualizar diccionario de productos
+        # Guardar o actualizar diccionario de productos (priorizando descripciones detalladas sobre placeholders estilo pz00X)
         if code_str not in productos_dict:
             productos_dict[code_str] = {
                 "codigo": code_str,
@@ -45,6 +44,10 @@ def importar_datos_excel(filepath: str, db: Session):
                 "categoria": categoria,
                 "stock_actual": 0.0
             }
+        else:
+            current_desc = productos_dict[code_str]["descripcion"]
+            if current_desc.startswith("pz") and not desc.startswith("pz"):
+                productos_dict[code_str]["descripcion"] = desc
 
         # Manejo de fecha
         fecha_val = row["Fecha"]
@@ -83,13 +86,13 @@ def importar_datos_excel(filepath: str, db: Session):
     db.commit()
 
     prod_incluir_objs = []
+    prod_incluir_codes = set()
     for _, row in df_prod.iterrows():
         raw_code = str(row["CODIGO"]).strip()
         if raw_code.endswith(".0"):
-            code = raw_code[:-2]
+            code_str = raw_code[:-2]
         else:
-            code = raw_code
-        code_str = f"REF-{int(code):03d}" if code.isdigit() else code
+            code_str = raw_code
 
         desc = str(row["DESCRIPCIÓN"]).strip() if pd.notnull(row["DESCRIPCIÓN"]) else ""
         cat = str(row["CATEGORIA"]).strip() if pd.notnull(row["CATEGORIA"]) else "General"
@@ -116,53 +119,31 @@ def importar_datos_excel(filepath: str, db: Session):
             diciembre=get_m("DICIEMBRE")
         )
         prod_incluir_objs.append(prod_inc)
-
-        # Si el producto a incluir no está en productos, añadirlo
-        if code_str not in productos_dict:
-            productos_dict[code_str] = {
-                "codigo": code_str,
-                "descripcion": desc,
-                "categoria": cat,
-                "stock_actual": 0.0
-            }
-        else:
-            # Si su categoría era #REF!, actualizar con la categoría real del producto a incluir
-            if productos_dict[code_str]["categoria"] == "General":
-                productos_dict[code_str]["categoria"] = cat
+        prod_incluir_codes.add(code_str)
 
     db.bulk_save_objects(prod_incluir_objs)
 
-    # 3. Guardar Productos en tabla Productos
+    # 3. Guardar Productos reales en la tabla Productos (sin duplicar productos a incluir ni inventar faltantes)
     for code, pdata in productos_dict.items():
+        if code in prod_incluir_codes:
+            continue
         existing = db.query(Producto).filter(Producto.codigo == code).first()
         if not existing:
             nuevo_prod = Producto(
                 codigo=pdata["codigo"],
                 descripcion=pdata["descripcion"],
                 categoria=pdata["categoria"],
-                stock_actual=pdata["stock_actual"]
+                stock_actual=pdata["stock_actual"],
+                activo=True
             )
             db.add(nuevo_prod)
         else:
             existing.descripcion = pdata["descripcion"]
             if existing.categoria == "General" and pdata["categoria"] != "General":
                 existing.categoria = pdata["categoria"]
+            existing.activo = True
 
     db.commit()
-
-    # 4. Asegurar que existan las 600 referencias para el cronograma si es necesario
-    tot_prods = db.query(Producto).count()
-    if tot_prods < 600:
-        for i in range(1, 601):
-            ref_code = f"REF-{i:03d}"
-            if not db.query(Producto).filter(Producto.codigo == ref_code).first():
-                db.add(Producto(
-                    codigo=ref_code,
-                    descripcion=f"Referencia de Catálogo {i:03d}",
-                    categoria="General",
-                    stock_actual=0.0
-                ))
-        db.commit()
 
     # 5. Generar un cronograma inicial si no existe
     if db.query(Cronograma).count() == 0:
@@ -184,14 +165,13 @@ def generar_y_guardar_cronograma(db: Session, nombre="Cronograma Cíclico Anual"
     prods_elegibles = db.query(Producto.codigo).filter(Producto.activo == True).order_by(Producto.codigo.asc()).all()
     referencias = [p[0] for p in prods_elegibles]
 
-    # Si no hay productos, o para garantizar compatibilidad con 600 refs
     if not referencias:
-        referencias = [f"REF-{i+1:03d}" for i in range(600)]
+        return None
 
     cronograma_dict, cuotas, resumen = generar_cronograma_algoritmo(
         referencias=referencias,
         fecha_inicio=f_inicio,
-        counts_per_ref=5
+        counts_per_ref=1
     )
 
     nuevo_crono = Cronograma(

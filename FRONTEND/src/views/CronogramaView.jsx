@@ -231,7 +231,7 @@ export function CronogramaView() {
                 <span className="kpi-label">Referencias Elegibles</span>
                 <div className="kpi-value">{data.kpis.referencias_elegibles.toLocaleString()}</div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  {data.kpis.referencias_completadas_5} con 5/5 conteos
+                  del Catálogo Activo
                 </span>
               </div>
             </div>
@@ -411,8 +411,8 @@ export function CronogramaView() {
                         </span>
                       </td>
                       <td>
-                        <span className={`badge ${item.conteos_confirmados_ref >= 5 ? 'badge-success' : 'badge-secondary'}`}>
-                          {item.conteos_confirmados_ref} / 5
+                        <span className={`badge ${item.conteos_confirmados_ref > 0 ? 'badge-success' : 'badge-secondary'}`}>
+                          {item.conteos_confirmados_ref} {item.conteos_confirmados_ref === 1 ? 'conteo' : 'conteos'}
                         </span>
                       </td>
                       <td>Conteo #{item.numero_conteo}</td>
@@ -575,7 +575,7 @@ export function CronogramaView() {
                       <strong style={{ color: 'var(--text-main)', display: 'block', fontSize: '1.1rem' }}>{previewData.referencias_elegibles} referencias</strong>
                     </div>
                     <div>
-                      <span className="kpi-label">Conteos Objetivo (x5)</span>
+                      <span className="kpi-label">Conteos Objetivo</span>
                       <strong style={{ color: 'var(--primary)', display: 'block', fontSize: '1.1rem' }}>{previewData.total_conteos_objetivo.toLocaleString()} conteos</strong>
                     </div>
                     <div>
